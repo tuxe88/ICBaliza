@@ -9,9 +9,7 @@
 #include "esp_event.h" //for wifi event
 #include "nvs_flash.h" //non volatile storage
 #include "lwip/err.h" //light weight ip packets error handling
-#include "lwip/sys.h" //system applications for light weight ip apps
-const char *ssid = "";
-const char *pass = "";
+#include "secrets.h"
 #include "protocol_examples_common.h"
 #include "protocol_examples_utils.h"
 #include <esp_http_server.h>
@@ -250,46 +248,31 @@ static const httpd_uri_t testing = {
     .handler   = testing_get_handler,
     /* Let's pass response string in user
      * context to demonstrate it's usage */
-    .user_ctx  = "Test?"
-};
-
-/* An HTTP POST handler */
-static esp_err_t echo_post_handler(httpd_req_t *req)
-{
-    char buf[100];
-    int ret, remaining = req->content_len;
-
-    while (remaining > 0) {
-        /* Read the data for the request */
-        if ((ret = httpd_req_recv(req, buf,
-                        MIN(remaining, sizeof(buf)))) <= 0) {
-            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-                /* Retry receiving if timeout occurred */
-                continue;
-            }
-            return ESP_FAIL;
-        }
-
-        /* Send back the same data */
-        httpd_resp_send_chunk(req, buf, ret);
-        remaining -= ret;
-
-        /* Log data received */
-        ESP_LOGI(TAG, "=========== RECEIVED DATA ==========");
-        ESP_LOGI(TAG, "%.*s", ret, buf);
-        ESP_LOGI(TAG, "====================================");
-    }
-
-    // End response
-    httpd_resp_send_chunk(req, NULL, 0);
-    return ESP_OK;
-}
-
-static const httpd_uri_t echo = {
-    .uri       = "/echo",
-    .method    = HTTP_POST,
-    .handler   = echo_post_handler,
-    .user_ctx  = NULL
+    .user_ctx  = "<!DOCTYPE html>\n"
+                 "<html>\n"
+                 "<head>\n"
+                 "    <title>Page Title</title>\n"
+                 "</head>\n"
+                 " \n"
+                 "<body>\n"
+                 "    <h2>Welcome To GFG</h2>\n"
+                 "    <form>\n"
+                 " \n"
+                 "        <p>\n"
+                 "            <label>Username : <input type=\"text\" /></label>\n"
+                 "        </p>\n"
+                 " \n"
+                 "        <p>\n"
+                 "            <label>Password : <input type=\"password\" /></label>\n"
+                 "        </p>\n"
+                 " \n"
+                 "        <p>\n"
+                 "            <button type=\"submit\">Submit</button>\n"
+                 "        </p>\n"
+                 " \n"
+                 "    </form>\n"
+                 "</body>\n"
+                 "</html>"
 };
 
 /* An HTTP POST handler */
@@ -324,7 +307,7 @@ static esp_err_t state_post_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
-static const httpd_uri_t echo = {
+static const httpd_uri_t state = {
     .uri       = "/state",
     .method    = HTTP_POST,
     .handler   = state_post_handler,
@@ -377,14 +360,14 @@ static esp_err_t ctrl_put_handler(httpd_req_t *req)
         /* URI handlers can be unregistered using the uri string */
         ESP_LOGI(TAG, "Unregistering /hello and /echo URIs");
         httpd_unregister_uri(req->handle, "/testing");
-        httpd_unregister_uri(req->handle, "/echo");
+        httpd_unregister_uri(req->handle, "/state");
         /* Register the custom error handler */
         httpd_register_err_handler(req->handle, HTTPD_404_NOT_FOUND, http_404_error_handler);
     }
     else {
         ESP_LOGI(TAG, "Registering /hello and /echo URIs");
         httpd_register_uri_handler(req->handle, &testing);
-        httpd_register_uri_handler(req->handle, &echo);
+        httpd_register_uri_handler(req->handle, &state);
         /* Unregister custom error handler */
         httpd_register_err_handler(req->handle, HTTPD_404_NOT_FOUND, NULL);
     }
@@ -419,9 +402,9 @@ static httpd_handle_t start_webserver(void)
     if (httpd_start(&server, &config) == ESP_OK) {
         // Set URI handlers
         ESP_LOGI(TAG, "Registering URI handlers");
-        httpd_register_uri_handler(server, &testing);
-        httpd_register_uri_handler(server, &echo);
-        httpd_register_uri_handler(server, &ctrl);
+        httpd_register_uri_handler(server, &testing); //ejemplo de get
+        httpd_register_uri_handler(server, &state);   //ejemplo de post
+        httpd_register_uri_handler(server, &ctrl);    //ejemplo de put
         #if CONFIG_EXAMPLE_BASIC_AUTH
         httpd_register_basic_auth(server);
         #endif
@@ -506,13 +489,13 @@ void wifi_connection()
     .password = "", /*we are sending a const char of ssid and password which we will strcpy in following line so leaving it blank*/
         } // also this part is used if you donot want to use Kconfig.projbuild
     };
-strcpy((char *)wifi_configuration.sta.ssid, "sublime"); // copy chars from hardcoded configs to struct
-strcpy((char *)wifi_configuration.sta.password, "Muahaniaks06");
+strcpy((char *)wifi_configuration.sta.ssid, WIFI_SSID); // copy chars from hardcoded configs to struct
+strcpy((char *)wifi_configuration.sta.password, WIFI_PASSWORD);
 esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_configuration); // setting up configs when event ESP_IF_WIFI_STA
 esp_wifi_start();
 esp_wifi_set_mode(WIFI_MODE_STA);//station mode selected
 esp_wifi_connect();                   // connect with saved ssid and pass
-printf("wifi_init_softap finished. SSID:%s  password:%s", ssid, pass);
+
 }
 
 void app_main()
