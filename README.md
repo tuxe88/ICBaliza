@@ -6,6 +6,9 @@
 - para utilizar IC Baliza, primero crear el archivo de constantes. Dentro de la carpeta include, crear "secrets.h" y definir:
   - WIFI_SSID
   - WIFI_PASSWORD
+  - CONFIG_EXAMPLE_BASIC_AUTH_USERNAME
+  - CONFIG_EXAMPLE_BASIC_AUTH_PASSWORD
+
 
 Ejemplo de arcivo secrets.h:
 
@@ -15,6 +18,8 @@ Ejemplo de arcivo secrets.h:
 
 #define WIFI_SSID "ssid_de_tu_wifi"
 #define WIFI_PASSWORD "clave_super_secreta_de_wifi"
+#define CONFIG_EXAMPLE_BASIC_AUTH_USERNAME "admin"
+#define CONFIG_EXAMPLE_BASIC_AUTH_PASSWORD "password_admin"
 
 #endif //ICBALIZA_SECRETS_H
 ```

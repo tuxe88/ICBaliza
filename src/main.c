@@ -10,11 +10,14 @@
 #include "nvs_flash.h" //non volatile storage
 #include "lwip/err.h" //light weight ip packets error handling
 #include "secrets.h"
+#include "esp_tls_crypto.h"
 #include "protocol_examples_common.h"
 #include "protocol_examples_utils.h"
 #include <esp_http_server.h>
 
 int retry_num = 0;
+
+#define CONFIG_EXAMPLE_BASIC_AUTH 1
 
 #if !CONFIG_IDF_TARGET_LINUX
 #include <esp_wifi.h>
@@ -30,6 +33,7 @@ int retry_num = 0;
  */
 
 static const char *TAG = "example";
+static const char *ERR_TAG = "[ERROR]:";
 
 #if CONFIG_EXAMPLE_BASIC_AUTH
 
@@ -166,6 +170,21 @@ static esp_err_t testing_get_handler(httpd_req_t *req)
     char*  buf;
     size_t buf_len;
 
+    buf_len = httpd_req_get_hdr_value_len(req, "X-API-KEY") + 1;
+    if (buf_len > 1) {
+        buf = malloc(buf_len);
+        /* Copy null terminated value string into buffer */
+        if (httpd_req_get_hdr_value_str(req, "X-API-KEY", buf, buf_len) != ESP_OK) {
+            ESP_LOGE(ERR_TAG, "X-API-KEY Necesaria");
+            httpd_resp_set_status(req, HTTPD_401);
+            httpd_resp_set_type(req, "application/json");
+            httpd_resp_set_hdr(req, "Connection", "keep-alive");
+            httpd_resp_set_hdr(req, "WWW-Authenticate", "Basic realm=\"Hello\"");
+            httpd_resp_send(req, NULL, 0);
+        }
+        free(buf);
+    }
+
     /* Get header value string length and allocate memory for length + 1,
      * extra byte for null termination */
     buf_len = httpd_req_get_hdr_value_len(req, "Host") + 1;
@@ -251,23 +270,23 @@ static const httpd_uri_t testing = {
     .user_ctx  = "<!DOCTYPE html>\n"
                  "<html>\n"
                  "<head>\n"
-                 "    <title>Page Title</title>\n"
+                 "    <title>Baliza CI</title>\n"
                  "</head>\n"
                  " \n"
                  "<body>\n"
-                 "    <h2>Welcome To GFG</h2>\n"
+                 "    <h2>Bienvenido a Baliza CI - Ingrese sus credenciales</h2>\n"
                  "    <form>\n"
                  " \n"
                  "        <p>\n"
-                 "            <label>Username : <input type=\"text\" /></label>\n"
+                 "            <label>Usuario : <input type=\"text\" /></label>\n"
                  "        </p>\n"
                  " \n"
                  "        <p>\n"
-                 "            <label>Password : <input type=\"password\" /></label>\n"
+                 "            <label>Contraseña : <input type=\"password\" /></label>\n"
                  "        </p>\n"
                  " \n"
                  "        <p>\n"
-                 "            <button type=\"submit\">Submit</button>\n"
+                 "            <button type=\"submit\">Login</button>\n"
                  "        </p>\n"
                  " \n"
                  "    </form>\n"
