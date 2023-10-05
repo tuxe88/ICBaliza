@@ -3,7 +3,9 @@
         "random": "c",
         "protocol_examples_common.h": "c",
         "nvs_flash.h": "c",
-        "protocol_examples_utils.h": "c"
+        "protocol_examples_utils.h": "c",
+        "esp_tls_crypto.h": "c",
+        "secrets.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled"
 }
