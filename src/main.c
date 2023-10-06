@@ -13,8 +13,8 @@
 #include "secrets.h"
 #include "esp_tls_crypto.h"
 #include "esp_tls.h"
-#include "protocol_examples_common.h"
-#include "protocol_examples_utils.h"
+#include <cJSON.h>
+#include "driver/gpio.h"
 #include "esp_crt_bundle.h"
 
 #include <esp_http_server.h>
@@ -22,17 +22,10 @@
 
 int retry_num = 0;
 int build_state = 0;
-
-#define CONFIG_EXAMPLE_BASIC_AUTH 1
-
-#if !CONFIG_IDF_TARGET_LINUX
-#include <esp_wifi.h>
-#include <esp_system.h>
-#include "nvs_flash.h"
-#include "esp_eth.h"
-#endif  // !CONFIG_IDF_TARGET_LINUX
+#define LED_PIN 23
 
 #define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN  (64)
+
 
 /* A simple example that demonstrates how to create GET and POST
  * handlers for the web server.
@@ -40,135 +33,6 @@ int build_state = 0;
 
 static const char *TAG = "example";
 static const char *ERR_TAG = "[ERROR]:";
-
-#if CONFIG_EXAMPLE_BASIC_AUTH
-
-typedef struct {
-    char    *username;
-    char    *password;
-} basic_auth_info_t;
-
-#define HTTPD_401      "401 UNAUTHORIZED"           /*!< HTTP Response 401 */
-
-static char *http_auth_basic(const char *username, const char *password)
-{
-    size_t out;
-    char *user_info = NULL;
-    char *digest = NULL;
-    size_t n = 0;
-    int rc = asprintf(&user_info, "%s:%s", username, password);
-    if (rc < 0) {
-        ESP_LOGE(TAG, "asprintf() returned: %d", rc);
-        return NULL;
-    }
-
-    if (!user_info) {
-        ESP_LOGE(TAG, "No enough memory for user information");
-        return NULL;
-    }
-    esp_crypto_base64_encode(NULL, 0, &n, (const unsigned char *)user_info, strlen(user_info));
-
-    /* 6: The length of the "Basic " string
-     * n: Number of bytes for a base64 encode format
-     * 1: Number of bytes for a reserved which be used to fill zero
-    */
-    digest = calloc(1, 6 + n + 1);
-    if (digest) {
-        strcpy(digest, "Basic ");
-        esp_crypto_base64_encode((unsigned char *)digest + 6, n, &out, (const unsigned char *)user_info, strlen(user_info));
-    }
-    free(user_info);
-    return digest;
-}
-
-/* An HTTP GET handler */
-static esp_err_t basic_auth_get_handler(httpd_req_t *req)
-{
-    char *buf = NULL;
-    size_t buf_len = 0;
-    basic_auth_info_t *basic_auth_info = req->user_ctx;
-
-    buf_len = httpd_req_get_hdr_value_len(req, "Authorization") + 1;
-    if (buf_len > 1) {
-        buf = calloc(1, buf_len);
-        if (!buf) {
-            ESP_LOGE(TAG, "No enough memory for basic authorization");
-            return ESP_ERR_NO_MEM;
-        }
-
-        if (httpd_req_get_hdr_value_str(req, "Authorization", buf, buf_len) == ESP_OK) {
-            ESP_LOGI(TAG, "Found header => Authorization: %s", buf);
-        } else {
-            ESP_LOGE(TAG, "No auth value received");
-        }
-
-        char *auth_credentials = http_auth_basic(basic_auth_info->username, basic_auth_info->password);
-        if (!auth_credentials) {
-            ESP_LOGE(TAG, "No enough memory for basic authorization credentials");
-            free(buf);
-            return ESP_ERR_NO_MEM;
-        }
-
-        if (strncmp(auth_credentials, buf, buf_len)) {
-            ESP_LOGE(TAG, "Not authenticated");
-            httpd_resp_set_status(req, HTTPD_401);
-            httpd_resp_set_type(req, "application/json");
-            httpd_resp_set_hdr(req, "Connection", "keep-alive");
-            httpd_resp_set_hdr(req, "WWW-Authenticate", "Basic realm=\"Hello\"");
-            httpd_resp_send(req, NULL, 0);
-        } else {
-            ESP_LOGI(TAG, "Authenticated!");
-            char *basic_auth_resp = NULL;
-            httpd_resp_set_status(req, HTTPD_200);
-            httpd_resp_set_type(req, "application/json");
-            httpd_resp_set_hdr(req, "Connection", "keep-alive");
-            int rc = asprintf(&basic_auth_resp, "{\"authenticated\": true,\"user\": \"%s\"}", basic_auth_info->username);
-            if (rc < 0) {
-                ESP_LOGE(TAG, "asprintf() returned: %d", rc);
-                free(auth_credentials);
-                return ESP_FAIL;
-            }
-            if (!basic_auth_resp) {
-                ESP_LOGE(TAG, "No enough memory for basic authorization response");
-                free(auth_credentials);
-                free(buf);
-                return ESP_ERR_NO_MEM;
-            }
-            httpd_resp_send(req, basic_auth_resp, strlen(basic_auth_resp));
-            free(basic_auth_resp);
-        }
-        free(auth_credentials);
-        free(buf);
-    } else {
-        ESP_LOGE(TAG, "No auth header received");
-        httpd_resp_set_status(req, HTTPD_401);
-        httpd_resp_set_type(req, "application/json");
-        httpd_resp_set_hdr(req, "Connection", "keep-alive");
-        httpd_resp_set_hdr(req, "WWW-Authenticate", "Basic realm=\"Hello\"");
-        httpd_resp_send(req, NULL, 0);
-    }
-
-    return ESP_OK;
-}
-
-static httpd_uri_t basic_auth = {
-    .uri       = "/basic_auth",
-    .method    = HTTP_GET,
-    .handler   = basic_auth_get_handler,
-};
-
-static void httpd_register_basic_auth(httpd_handle_t server)
-{
-    basic_auth_info_t *basic_auth_info = calloc(1, sizeof(basic_auth_info_t));
-    if (basic_auth_info) {
-        basic_auth_info->username = CONFIG_EXAMPLE_BASIC_AUTH_USERNAME;
-        basic_auth_info->password = CONFIG_EXAMPLE_BASIC_AUTH_PASSWORD;
-
-        basic_auth.user_ctx = basic_auth_info;
-        httpd_register_uri_handler(server, &basic_auth);
-    }
-}
-#endif
 
 /* An HTTP GET handler */
 static esp_err_t testing_get_handler(httpd_req_t *req)
@@ -182,7 +46,7 @@ static esp_err_t testing_get_handler(httpd_req_t *req)
         /* Copy null terminated value string into buffer */
         if (httpd_req_get_hdr_value_str(req, "X-API-KEY", buf, buf_len) != ESP_OK) {
             ESP_LOGE(ERR_TAG, "X-API-KEY Necesaria");
-            httpd_resp_set_status(req, HTTPD_401);
+            //httpd_resp_set_status(req, HTTPD_401);
             httpd_resp_set_type(req, "application/json");
             httpd_resp_set_hdr(req, "Connection", "keep-alive");
             httpd_resp_set_hdr(req, "WWW-Authenticate", "Basic realm=\"Hello\"");
@@ -232,17 +96,17 @@ static esp_err_t testing_get_handler(httpd_req_t *req)
             /* Get value of expected key from query string */
             if (httpd_query_key_value(buf, "query1", param, sizeof(param)) == ESP_OK) {
                 ESP_LOGI(TAG, "Found URL query parameter => query1=%s", param);
-                example_uri_decode(dec_param, param, strnlen(param, EXAMPLE_HTTP_QUERY_KEY_MAX_LEN));
+                //example_uri_decode(dec_param, param, strnlen(param, EXAMPLE_HTTP_QUERY_KEY_MAX_LEN));
                 ESP_LOGI(TAG, "Decoded query parameter => %s", dec_param);
             }
             if (httpd_query_key_value(buf, "query3", param, sizeof(param)) == ESP_OK) {
                 ESP_LOGI(TAG, "Found URL query parameter => query3=%s", param);
-                example_uri_decode(dec_param, param, strnlen(param, EXAMPLE_HTTP_QUERY_KEY_MAX_LEN));
+                //example_uri_decode(dec_param, param, strnlen(param, EXAMPLE_HTTP_QUERY_KEY_MAX_LEN));
                 ESP_LOGI(TAG, "Decoded query parameter => %s", dec_param);
             }
             if (httpd_query_key_value(buf, "query2", param, sizeof(param)) == ESP_OK) {
                 ESP_LOGI(TAG, "Found URL query parameter => query2=%s", param);
-                example_uri_decode(dec_param, param, strnlen(param, EXAMPLE_HTTP_QUERY_KEY_MAX_LEN));
+                //example_uri_decode(dec_param, param, strnlen(param, EXAMPLE_HTTP_QUERY_KEY_MAX_LEN));
                 ESP_LOGI(TAG, "Decoded query parameter => %s", dec_param);
             }
         }
@@ -305,7 +169,7 @@ static esp_err_t state_post_handler(httpd_req_t *req)
 {
     char buf[100];
     int ret, remaining = req->content_len;
-    int newState = 0;
+    
     while (remaining > 0) {
         /* Read the data for the request */
         if ((ret = httpd_req_recv(req, buf,
@@ -366,49 +230,6 @@ esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err)
     return ESP_FAIL;
 }
 
-/* An HTTP PUT handler. This demonstrates realtime
- * registration and deregistration of URI handlers
- */
-static esp_err_t ctrl_put_handler(httpd_req_t *req)
-{
-    char buf;
-    int ret;
-
-    if ((ret = httpd_req_recv(req, &buf, 1)) <= 0) {
-        if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-            httpd_resp_send_408(req);
-        }
-        return ESP_FAIL;
-    }
-
-    if (buf == '0') {
-        /* URI handlers can be unregistered using the uri string */
-        ESP_LOGI(TAG, "Unregistering /hello and /echo URIs");
-        httpd_unregister_uri(req->handle, "/testing");
-        httpd_unregister_uri(req->handle, "/state");
-        /* Register the custom error handler */
-        httpd_register_err_handler(req->handle, HTTPD_404_NOT_FOUND, http_404_error_handler);
-    }
-    else {
-        ESP_LOGI(TAG, "Registering /hello and /echo URIs");
-        httpd_register_uri_handler(req->handle, &testing);
-        httpd_register_uri_handler(req->handle, &state);
-        /* Unregister custom error handler */
-        httpd_register_err_handler(req->handle, HTTPD_404_NOT_FOUND, NULL);
-    }
-
-    /* Respond with empty body */
-    httpd_resp_send(req, NULL, 0);
-    return ESP_OK;
-}
-
-static const httpd_uri_t ctrl = {
-    .uri       = "/ctrl",
-    .method    = HTTP_PUT,
-    .handler   = ctrl_put_handler,
-    .user_ctx  = NULL
-};
-
 static httpd_handle_t start_webserver(void)
 {
     httpd_handle_t server = NULL;
@@ -429,9 +250,8 @@ static httpd_handle_t start_webserver(void)
         ESP_LOGI(TAG, "Registering URI handlers");
         httpd_register_uri_handler(server, &testing); //ejemplo de get
         httpd_register_uri_handler(server, &state);   //ejemplo de post
-        httpd_register_uri_handler(server, &ctrl);    //ejemplo de put
         #if CONFIG_EXAMPLE_BASIC_AUTH
-        httpd_register_basic_auth(server);
+        //httpd_register_basic_auth(server);
         #endif
         return server;
     }
@@ -439,39 +259,6 @@ static httpd_handle_t start_webserver(void)
     ESP_LOGI(TAG, "Error starting server!");
     return NULL;
 }
-
-#if !CONFIG_IDF_TARGET_LINUX
-static esp_err_t stop_webserver(httpd_handle_t server)
-{
-    // Stop the httpd server
-    return httpd_stop(server);
-}
-
-static void disconnect_handler(void* arg, esp_event_base_t event_base,
-                               int32_t event_id, void* event_data)
-{
-    httpd_handle_t* server = (httpd_handle_t*) arg;
-    if (*server) {
-        ESP_LOGI(TAG, "Stopping webserver");
-        if (stop_webserver(*server) == ESP_OK) {
-            *server = NULL;
-        } else {
-            ESP_LOGE(TAG, "Failed to stop http server");
-        }
-    }
-}
-
-static void connect_handler(void* arg, esp_event_base_t event_base,
-                            int32_t event_id, void* event_data)
-{
-    httpd_handle_t* server = (httpd_handle_t*) arg;
-    if (*server == NULL) {
-        ESP_LOGI(TAG, "Starting webserver");
-        *server = start_webserver();
-    }
-}
-#endif // !CONFIG_IDF_TARGET_LINUX
-
 
 static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
@@ -486,6 +273,7 @@ static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_b
     else if (event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
         printf("WiFi lost connection\n");
+        build_state = 1;
         if (retry_num < 5)
         {
             esp_wifi_connect();
@@ -558,9 +346,19 @@ esp_err_t client_event_get_handler(esp_http_client_event_t *evt){
     case HTTP_EVENT_ON_FINISH:
         ESP_LOGI(TAG, "HTTP_EVENT_ON_FINISH");
         if (output_buffer != NULL) {
-            // Response is accumulated in output_buffer. Uncomment the below line to print the accumulated response
-            printf("%s", output_buffer);
+            cJSON * request_result = cJSON_Parse(output_buffer);
+            cJSON * workflow_state = cJSON_GetObjectItem(cJSON_GetArrayItem(cJSON_GetObjectItem(request_result,"workflow_runs"),0),"conclusion");
+            printf("%s", cJSON_Print(workflow_state));
             free(output_buffer);
+            free(request_result);
+            char * workflow_result = workflow_state->valuestring;
+
+            if(strcmp("success",workflow_result) == 0){
+                build_state = 2;
+            }else if(strcmp("failure",workflow_result) == 0){
+                build_state = 0;
+            }
+            
             output_buffer = NULL;
         }
         output_len = 0;
@@ -582,6 +380,7 @@ esp_err_t client_event_get_handler(esp_http_client_event_t *evt){
     default:
         break;
     }
+
     return ESP_OK;
 }
 
@@ -600,7 +399,7 @@ static void get_workflows_github(){
     //char *post_data = "{\"saa\":\"dsdssdadsa\"}";
     //esp_http_client_set_post_field(client, post_data, strlen(post_data));
     esp_http_client_set_header(client,"Content-Type","application/vnd.github+json");
-    esp_http_client_set_header(client,"Authorization","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");
+    esp_http_client_set_header(client,"Authorization","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");
     esp_http_client_set_header(client,"X-GitHub-Api-Version","2022-11-28");
 
     esp_http_client_perform(client);
@@ -608,9 +407,12 @@ static void get_workflows_github(){
 }
 
 void app_main()
-{
+{   
     ESP_ERROR_CHECK(nvs_flash_init());
     wifi_connection();
+    esp_rom_gpio_pad_select_gpio(LED_PIN);
+    gpio_set_direction(LED_PIN, GPIO_MODE_OUTPUT);
+
 
     static httpd_handle_t server = NULL;
 
@@ -635,6 +437,9 @@ void app_main()
     server = start_webserver();
     while (server) {
         printf("build state %d\n",build_state);
+        if(build_state == 2){
+            gpio_set_level(LED_PIN, 1);
+        }
         get_workflows_github();
         sleep(15);
     }
