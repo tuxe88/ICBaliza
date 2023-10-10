@@ -21,7 +21,7 @@
 #include "esp_http_client.h"
 
 int retry_num = 0;
-int build_state = 0;
+int build_state = 1;
 #define LED_PIN 23
 
 #define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN  (64)
@@ -265,6 +265,7 @@ static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_b
     if (event_id == WIFI_EVENT_STA_START)
     {
         printf("WIFI CONNECTING....\n");
+        //build_state = 1;
     }
     else if (event_id == WIFI_EVENT_STA_CONNECTED)
     {
@@ -306,7 +307,7 @@ strcpy((char *)wifi_configuration.sta.ssid, WIFI_SSID); // copy chars from hardc
 strcpy((char *)wifi_configuration.sta.password, WIFI_PASSWORD);
 esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_configuration); // setting up configs when event ESP_IF_WIFI_STA
 esp_wifi_start();
-esp_wifi_set_mode(WIFI_MODE_STA);//station mode selected
+esp_wifi_set_mode(WIFI_MODE_STA);     //station mode selected
 esp_wifi_connect();                   // connect with saved ssid and pass
 
 }
@@ -434,7 +435,20 @@ void app_main()
     #endif // !CONFIG_IDF_TARGET_LINUX
     
     /* Start the server for the first time */
-    server = start_webserver();
+    while(1){
+        printf("build state %d\n",build_state);
+        switch (build_state){
+
+            default:
+                gpio_set_level(LED_PIN, 1);
+                break;
+
+        }
+        get_workflows_github();
+        sleep(5);
+    }
+
+    /*server = start_webserver();
     while (server) {
         printf("build state %d\n",build_state);
         if(build_state == 2){
@@ -442,5 +456,5 @@ void app_main()
         }
         get_workflows_github();
         sleep(15);
-    }
+    }*/
 }
