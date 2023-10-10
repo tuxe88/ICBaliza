@@ -3,7 +3,17 @@
         "random": "c",
         "protocol_examples_common.h": "c",
         "nvs_flash.h": "c",
-        "protocol_examples_utils.h": "c"
+        "protocol_examples_utils.h": "c",
+        "esp_tls_crypto.h": "c",
+        "secrets.h": "c",
+        "err.h": "c",
+        "gpio.h": "c",
+        "esp_intr_alloc.h": "c",
+        "soc_caps.h": "c",
+        "stdbool.h": "c",
+        "cjson.h": "c",
+        "esp_err.h": "c",
+        "sdkconfig.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled",
     "cmake.configureOnOpen": true
