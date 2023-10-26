@@ -18,6 +18,8 @@ Ejemplo de arcivo secrets.h:
 
 #define WIFI_SSID "ssid_de_tu_wifi"
 #define WIFI_PASSWORD "clave_super_secreta_de_wifi"
+#define REPO_OWNER "Tuxe88"
+#define REPO_NAME "ICBalizaTester"
 #define CONFIG_EXAMPLE_BASIC_AUTH_USERNAME "admin"
 #define CONFIG_EXAMPLE_BASIC_AUTH_PASSWORD "password_admin"
 

@@ -24,15 +24,15 @@
 int retry_num = 0;
 int build_state = 1;
 
-#define DELAY_TIME 100
+#define DELAY_TIME 1000
 
 //pin 22 es el led azul
 
-
 #define BUZZER GPIO_NUM_18
-#define LED_VERDE GPIO_NUM_22
+#define LED_VERDE GPIO_NUM_23
 #define LED_AZUL GPIO_NUM_21
-#define LED_ROJO GPIO_NUM_23 
+#define LED_ROJO GPIO_NUM_22 
+
 #define STATE_DISCONNECTED 1
 #define STATE_BUILD_FAILED 0
 #define STATE_BUILD_SUCCESS 2
@@ -49,6 +49,7 @@ static const char *ERR_TAG = "[ERROR]:";
 
 void test();
 void beepBuzzer();
+void stateChangedLed(int ledNumber);
 
 /* An HTTP GET handler */
 static esp_err_t testing_get_handler(httpd_req_t *req)
@@ -329,6 +330,7 @@ esp_wifi_connect();                   // connect with saved ssid and pass
 
 }
 
+
 esp_err_t client_event_get_handler(esp_http_client_event_t *evt){
 
     static char *output_buffer;  // Buffer to store response of http request from event handler
@@ -337,7 +339,7 @@ esp_err_t client_event_get_handler(esp_http_client_event_t *evt){
     switch (evt->event_id)
     {
     case HTTP_EVENT_ON_DATA:
-        ESP_LOGI(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
+        //ESP_LOGI(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
         /*
          *  Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
          *  However, event handler can also be used in case chunked encoding is used.
@@ -362,21 +364,39 @@ esp_err_t client_event_get_handler(esp_http_client_event_t *evt){
 
         break;
     case HTTP_EVENT_ON_FINISH:
-        ESP_LOGI(TAG, "HTTP_EVENT_ON_FINISH");
+        //ESP_LOGI(TAG, "HTTP_EVENT_ON_FINISH");
         if (output_buffer != NULL) {
+        //printf("status code: %d\n",esp_http_client_get_status_code());
             cJSON * request_result = cJSON_Parse(output_buffer);
-            cJSON * workflow_state = cJSON_GetObjectItem(cJSON_GetArrayItem(cJSON_GetObjectItem(request_result,"workflow_runs"),0),"conclusion");
-            printf("%s", cJSON_Print(request_result));
+
+            //printf("%s", cJSON_Print(request_result));
+            cJSON * workflow_status = cJSON_GetObjectItem(cJSON_GetArrayItem(cJSON_GetObjectItem(request_result,"workflow_runs"),0),"status");
+            cJSON * workflow_conclusion = cJSON_GetObjectItem(cJSON_GetArrayItem(cJSON_GetObjectItem(request_result,"workflow_runs"),0),"conclusion");
+            //printf("%s", cJSON_Print(workflow_conclusion));
             free(output_buffer);
             free(request_result);
-            char * workflow_result = workflow_state->valuestring;
-
-            if(strcmp("success",workflow_result) == 0){
-                build_state = 2;
-            }else if(strcmp("failure",workflow_result) == 0){
-                build_state = 0;
+            char * workflow_status_result = workflow_status->valuestring;
+            char * workflow_conclusion_result = workflow_conclusion->valuestring;
+            //printf("%s\n", workflow_status_result);
+            //printf("%s\n", workflow_conclusion_result);
+            //printf("%d\n", strcmp("success",workflow_conclusion_result) == 0);
+            if(strcmp("completed",workflow_status_result) == 0){
+                printf("completed: %s\n", workflow_status_result);
+                if(strcmp("success",workflow_conclusion_result) == 0){
+                    printf("success: %s\n", workflow_conclusion_result);
+                    build_state = 2;
+                }else if(strcmp("failure",workflow_conclusion_result) == 0){
+                    printf("failure: %s\n", workflow_conclusion_result);
+                    build_state = 0;
+                }else{
+                    printf("other: %s", workflow_conclusion_result);
+                    build_state = 0;
+                }
+            }else{
+                output_buffer = NULL;
+                return ESP_OK;
             }
-            
+
             output_buffer = NULL;
         }
         output_len = 0;
@@ -406,7 +426,7 @@ char responseBuffer[512];
 
 static void get_workflows_github(){
     esp_http_client_config_t config_get = {
-        .url = "https://api.github.com/repos/tuxe88/dyasc-2023/actions/runs?per_page=1&page=1",
+        .url = "https://api.github.com/repos/"REPO_OWNER"/"REPO_NAME"/actions/runs?per_page=1&page=1",
         .method = HTTP_METHOD_GET,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,  //Specify transport type
         .crt_bundle_attach = esp_crt_bundle_attach, //Attach the certificate bundle 
@@ -444,6 +464,10 @@ void app_main()
     gpio_set_direction(BUZZER, GPIO_MODE_OUTPUT);
     gpio_set_level(BUZZER, 0);
     
+
+    //vTaskDelay(DELAY_TIME*10 / portTICK_PERIOD_MS);
+    //gpio_set_level(BUZZER, 1);
+
     wifi_connection();
     //esp_rom_gpio_pad_select_gpio(LED_PIN);
     //gpio_set_direction(LED_PIN, GPIO_MODE_OUTPUT);
@@ -466,37 +490,45 @@ void app_main()
         ESP_ERROR_CHECK(esp_event_handler_register(ETH_EVENT, ETHERNET_EVENT_DISCONNECTED, &disconnect_handler, &server));
     #endif // CONFIG_EXAMPLE_CONNECT_ETHERNET
     #endif // !CONFIG_IDF_TARGET_LINUX
+
+    //test(); 
     
-
-    //test();
-
-
     while(1){
+        /*while(1){
+            beepBuzzer();   
+        }*/
+        
         int previous_state = build_state;
         get_workflows_github();
+        printf("previous state %d\n",previous_state);
         printf("build state %d\n",build_state);
 
         switch (build_state){
-            case STATE_BUILD_FAILED: //rojo
+            case 0: //rojo
+                printf("rojo");
                 gpio_set_level(LED_VERDE, 0);
                 gpio_set_level(LED_AZUL, 0);
                 gpio_set_level(LED_ROJO, 1);
                 if(previous_state==STATE_BUILD_SUCCESS){
+                    stateChangedLed(LED_ROJO);
                     beepBuzzer();
                 }
                 break;
             
-            case STATE_DISCONNECTED: //azul
+            case 1: //azul
+                printf("azul");
                 gpio_set_level(LED_VERDE, 0);
                 gpio_set_level(LED_AZUL, 1);
                 gpio_set_level(LED_ROJO, 0);
                 break;
             
-            case STATE_BUILD_SUCCESS: //verde
+            case 2: //verde
+                printf("verde");
                 gpio_set_level(LED_VERDE, 1);
                 gpio_set_level(LED_AZUL, 0);
                 gpio_set_level(LED_ROJO, 0);
                 if(previous_state==STATE_BUILD_FAILED){
+                    stateChangedLed(LED_VERDE);
                     beepBuzzer();
                 }
                 break;
@@ -509,7 +541,7 @@ void app_main()
 
         }
 
-        vTaskDelay(DELAY_TIME*60 / portTICK_PERIOD_MS);
+        vTaskDelay(DELAY_TIME*15 / portTICK_PERIOD_MS);
     }
 
     /*server = start_webserver();
@@ -527,10 +559,22 @@ void app_main()
 
 void beepBuzzer(){
     gpio_set_level(BUZZER, 0);
-    vTaskDelay(DELAY_TIME*10 / portTICK_PERIOD_MS);
+    printf("beep apagado");
+    vTaskDelay(DELAY_TIME/2 / portTICK_PERIOD_MS);
     gpio_set_level(BUZZER, 1);
-    vTaskDelay(DELAY_TIME*10 / portTICK_PERIOD_MS);
+    printf("beep prendido");
+    vTaskDelay(DELAY_TIME/2 / portTICK_PERIOD_MS);
     gpio_set_level(BUZZER, 0);
+    printf("beep apagado");
+}
+
+void stateChangedLed(int ledNumber){
+    for(int i=0;i<5;i++){
+        gpio_set_level(ledNumber, 0);
+        vTaskDelay(DELAY_TIME / portTICK_PERIOD_MS);
+        gpio_set_level(ledNumber, 1);
+        vTaskDelay(DELAY_TIME / portTICK_PERIOD_MS);
+    }
 }
 
 void test(){
