@@ -28,9 +28,11 @@ int build_state = 1;
 
 //pin 22 es el led azul
 
-#define LED_AZUL GPIO_NUM_32
-#define LED_ROJO GPIO_NUM_23 
+
+#define BUZZER GPIO_NUM_18
 #define LED_VERDE GPIO_NUM_22
+#define LED_AZUL GPIO_NUM_21
+#define LED_ROJO GPIO_NUM_23 
 #define STATE_DISCONNECTED 1
 #define STATE_BUILD_FAILED 0
 #define STATE_BUILD_SUCCESS 2
@@ -44,6 +46,9 @@ int build_state = 1;
 
 static const char *TAG = "example";
 static const char *ERR_TAG = "[ERROR]:";
+
+void test();
+void beepBuzzer();
 
 /* An HTTP GET handler */
 static esp_err_t testing_get_handler(httpd_req_t *req)
@@ -277,7 +282,7 @@ static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_b
     if (event_id == WIFI_EVENT_STA_START)
     {
         printf("WIFI CONNECTING....\n");
-        //build_state = 1;
+        build_state = 1;
     }
     else if (event_id == WIFI_EVENT_STA_CONNECTED)
     {
@@ -361,7 +366,7 @@ esp_err_t client_event_get_handler(esp_http_client_event_t *evt){
         if (output_buffer != NULL) {
             cJSON * request_result = cJSON_Parse(output_buffer);
             cJSON * workflow_state = cJSON_GetObjectItem(cJSON_GetArrayItem(cJSON_GetObjectItem(request_result,"workflow_runs"),0),"conclusion");
-            printf("%s", cJSON_Print(workflow_state));
+            printf("%s", cJSON_Print(request_result));
             free(output_buffer);
             free(request_result);
             char * workflow_result = workflow_state->valuestring;
@@ -428,13 +433,16 @@ void app_main()
     gpio_set_level(LED_ROJO, 0);
 
     gpio_reset_pin(LED_AZUL);
-    gpio_set_direction(LED_VERDE, GPIO_MODE_OUTPUT);
+    gpio_set_direction(LED_AZUL, GPIO_MODE_OUTPUT);
     gpio_set_level(LED_AZUL, 0);
-    gpio_set_level(LED_AZUL, 1);
 
     gpio_reset_pin(LED_VERDE);
     gpio_set_direction(LED_VERDE, GPIO_MODE_OUTPUT);
     gpio_set_level(LED_VERDE, 0);
+
+    gpio_reset_pin(BUZZER);
+    gpio_set_direction(BUZZER, GPIO_MODE_OUTPUT);
+    gpio_set_level(BUZZER, 0);
     
     wifi_connection();
     //esp_rom_gpio_pad_select_gpio(LED_PIN);
@@ -459,8 +467,12 @@ void app_main()
     #endif // CONFIG_EXAMPLE_CONNECT_ETHERNET
     #endif // !CONFIG_IDF_TARGET_LINUX
     
+
+    //test();
+
+
     while(1){
-                
+        int previous_state = build_state;
         get_workflows_github();
         printf("build state %d\n",build_state);
 
@@ -469,6 +481,9 @@ void app_main()
                 gpio_set_level(LED_VERDE, 0);
                 gpio_set_level(LED_AZUL, 0);
                 gpio_set_level(LED_ROJO, 1);
+                if(previous_state==STATE_BUILD_SUCCESS){
+                    beepBuzzer();
+                }
                 break;
             
             case STATE_DISCONNECTED: //azul
@@ -481,9 +496,14 @@ void app_main()
                 gpio_set_level(LED_VERDE, 1);
                 gpio_set_level(LED_AZUL, 0);
                 gpio_set_level(LED_ROJO, 0);
+                if(previous_state==STATE_BUILD_FAILED){
+                    beepBuzzer();
+                }
                 break;
 
             default:
+                gpio_set_level(LED_VERDE, 0);
+                gpio_set_level(LED_ROJO, 0);
                 gpio_set_level(LED_AZUL, 0);
                 break;
 
@@ -505,48 +525,52 @@ void app_main()
 
 }
 
+void beepBuzzer(){
+    gpio_set_level(BUZZER, 0);
+    vTaskDelay(DELAY_TIME*10 / portTICK_PERIOD_MS);
+    gpio_set_level(BUZZER, 1);
+    vTaskDelay(DELAY_TIME*10 / portTICK_PERIOD_MS);
+    gpio_set_level(BUZZER, 0);
+}
 
 void test(){
-
-    //Start the server for the first time */
-    build_state = build_state+1;
-    if(build_state>2){
-        build_state = 0;
-    }
     
     build_state = -1;
     
     while(1){
+        
         //Start the server for the first time */
         build_state = build_state+1;
         if(build_state>2){
             build_state = 0;
         }
-        
-        printf("build state %d\n",build_state);
-        vTaskDelay(DELAY_TIME*5 / portTICK_PERIOD_MS);
-        //build_state = 2;
 
+        printf("build state %d\n",build_state);
         switch (build_state){
             case 0:
                 gpio_set_level(LED_VERDE, 0);
                 gpio_set_level(LED_AZUL, 0);
                 gpio_set_level(LED_ROJO, 1);
+                beepBuzzer();
                 break;
             
             case 1: //verde
-                gpio_set_level(LED_VERDE, 1);
                 gpio_set_level(LED_AZUL, 0);
                 gpio_set_level(LED_ROJO, 0);
+                gpio_set_level(LED_VERDE, 1);
+                beepBuzzer();
                 break;
             
             case 2: //rojo
                 gpio_set_level(LED_VERDE, 0);
-                gpio_set_level(LED_AZUL, 1);
                 gpio_set_level(LED_ROJO, 0);
+                gpio_set_level(LED_AZUL, 1);
+                beepBuzzer();
                 break;
 
             default:
+                gpio_set_level(LED_VERDE, 0);
+                gpio_set_level(LED_ROJO, 0);
                 gpio_set_level(LED_AZUL, 0);
                 break;
 
