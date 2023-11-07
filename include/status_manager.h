@@ -7,6 +7,8 @@ typedef struct status_manager
   int build_status;
 } status_manager;
 
+void status_manager_init(status_manager* sm);
+
 int get_connection_status();
 void set_connection_status(int newStatus);
 

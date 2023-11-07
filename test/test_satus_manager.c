@@ -9,7 +9,11 @@ void tearDown(void) {
     // clean stuff up here
 }
 
-void test_status_0_on_init() {
+void test_wifi_status_0_on_init() {
+    TEST_ASSERT_TRUE(1);
+}
+
+void test_build_status_0_on_init() {
     TEST_ASSERT_TRUE(1);
 }
 
