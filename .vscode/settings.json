@@ -15,7 +15,9 @@
         "esp_err.h": "c",
         "sdkconfig.h": "c",
         "freertos.h": "c",
-        "unity.h": "c"
+        "unity.h": "c",
+        "esp_tls.h": "c",
+        "http_client.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled",
     "cmake.configureOnOpen": true

@@ -13,12 +13,8 @@ void test_wifi_status_0_on_init() {
     TEST_ASSERT_TRUE(1);
 }
 
-void test_build_status_0_on_init() {
-    TEST_ASSERT_TRUE(1);
-}
-
 void app_main( int argc, char **argv) {
     UNITY_BEGIN();
-    RUN_TEST(test_status_0_on_init);
+    RUN_TEST(test_wifi_status_0_on_init);
     UNITY_END();
 }
