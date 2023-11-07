@@ -544,17 +544,6 @@ void app_main()
         vTaskDelay(DELAY_TIME*15 / portTICK_PERIOD_MS);
     }
 
-    /*server = start_webserver();
-    while (server) {
-        printf("build state %d\n",build_state);
-        if(build_state == 2){
-            gpio_set_level(LED_PIN, 1);
-        }
-        get_workflows_github();
-        sleep(15);
-    }*/
-
-
 }
 
 void beepBuzzer(){
