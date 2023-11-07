@@ -443,7 +443,7 @@ static void get_workflows_github(){
     esp_http_client_cleanup(client);    
 }
 
-void app_main() 
+void app_main(void) 
 {   
     ESP_ERROR_CHECK(nvs_flash_init());
     

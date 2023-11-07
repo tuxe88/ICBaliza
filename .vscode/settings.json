@@ -13,7 +13,9 @@
         "stdbool.h": "c",
         "cjson.h": "c",
         "esp_err.h": "c",
-        "sdkconfig.h": "c"
+        "sdkconfig.h": "c",
+        "freertos.h": "c",
+        "unity.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled",
     "cmake.configureOnOpen": true
