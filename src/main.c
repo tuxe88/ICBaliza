@@ -15,7 +15,6 @@
 #include <cJSON.h>
 #include "esp_crt_bundle.h"
 
-#include <esp_http_server.h>
 #include "esp_http_client.h"
 
 #include "driver/gpio.h"
@@ -50,232 +49,6 @@ static const char *ERR_TAG = "[ERROR]:";
 void test();
 void beepBuzzer();
 void stateChangedLed(int ledNumber);
-
-/* An HTTP GET handler */
-static esp_err_t testing_get_handler(httpd_req_t *req)
-{
-    char*  buf;
-    size_t buf_len;
-
-    buf_len = httpd_req_get_hdr_value_len(req, "X-API-KEY") + 1;
-    if (buf_len > 1) {
-        buf = malloc(buf_len);
-        /* Copy null terminated value string into buffer */
-        if (httpd_req_get_hdr_value_str(req, "X-API-KEY", buf, buf_len) != ESP_OK) {
-            ESP_LOGE(ERR_TAG, "X-API-KEY Necesaria");
-            //httpd_resp_set_status(req, HTTPD_401);
-            httpd_resp_set_type(req, "application/json");
-            httpd_resp_set_hdr(req, "Connection", "keep-alive");
-            httpd_resp_set_hdr(req, "WWW-Authenticate", "Basic realm=\"Hello\"");
-            httpd_resp_send(req, NULL, 0);
-        }
-        free(buf);
-    }
-
-    /* Get header value string length and allocate memory for length + 1,
-     * extra byte for null termination */
-    buf_len = httpd_req_get_hdr_value_len(req, "Host") + 1;
-    if (buf_len > 1) {
-        buf = malloc(buf_len);
-        /* Copy null terminated value string into buffer */
-        if (httpd_req_get_hdr_value_str(req, "Host", buf, buf_len) == ESP_OK) {
-            ESP_LOGI(TAG, "Found header => Host: %s", buf);
-        }
-        free(buf);
-    }
-
-    buf_len = httpd_req_get_hdr_value_len(req, "Test-Header-2") + 1;
-    if (buf_len > 1) {
-        buf = malloc(buf_len);
-        if (httpd_req_get_hdr_value_str(req, "Test-Header-2", buf, buf_len) == ESP_OK) {
-            ESP_LOGI(TAG, "Found header => Test-Header-2: %s", buf);
-        }
-        free(buf);
-    }
-
-    buf_len = httpd_req_get_hdr_value_len(req, "Test-Header-1") + 1;
-    if (buf_len > 1) {
-        buf = malloc(buf_len);
-        if (httpd_req_get_hdr_value_str(req, "Test-Header-1", buf, buf_len) == ESP_OK) {
-            ESP_LOGI(TAG, "Found header => Test-Header-1: %s", buf);
-        }
-        free(buf);
-    }
-
-    /* Read URL query string length and allocate memory for length + 1,
-     * extra byte for null termination */
-    buf_len = httpd_req_get_url_query_len(req) + 1;
-    if (buf_len > 1) {
-        buf = malloc(buf_len);
-        if (httpd_req_get_url_query_str(req, buf, buf_len) == ESP_OK) {
-            ESP_LOGI(TAG, "Found URL query => %s", buf);
-            char param[EXAMPLE_HTTP_QUERY_KEY_MAX_LEN], dec_param[EXAMPLE_HTTP_QUERY_KEY_MAX_LEN] = {0};
-            /* Get value of expected key from query string */
-            if (httpd_query_key_value(buf, "query1", param, sizeof(param)) == ESP_OK) {
-                ESP_LOGI(TAG, "Found URL query parameter => query1=%s", param);
-                //example_uri_decode(dec_param, param, strnlen(param, EXAMPLE_HTTP_QUERY_KEY_MAX_LEN));
-                ESP_LOGI(TAG, "Decoded query parameter => %s", dec_param);
-            }
-            if (httpd_query_key_value(buf, "query3", param, sizeof(param)) == ESP_OK) {
-                ESP_LOGI(TAG, "Found URL query parameter => query3=%s", param);
-                //example_uri_decode(dec_param, param, strnlen(param, EXAMPLE_HTTP_QUERY_KEY_MAX_LEN));
-                ESP_LOGI(TAG, "Decoded query parameter => %s", dec_param);
-            }
-            if (httpd_query_key_value(buf, "query2", param, sizeof(param)) == ESP_OK) {
-                ESP_LOGI(TAG, "Found URL query parameter => query2=%s", param);
-                //example_uri_decode(dec_param, param, strnlen(param, EXAMPLE_HTTP_QUERY_KEY_MAX_LEN));
-                ESP_LOGI(TAG, "Decoded query parameter => %s", dec_param);
-            }
-        }
-        free(buf);
-    }
-
-    /* Set some custom headers */
-    httpd_resp_set_hdr(req, "Custom-Header-1", "Custom-Value-1");
-    httpd_resp_set_hdr(req, "Custom-Header-2", "Custom-Value-2");
-
-    /* Send response with custom headers and body set as the
-     * string passed in user context*/
-    const char* resp_str = (const char*) req->user_ctx;
-    httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
-
-    /* After sending the HTTP response the old HTTP request
-     * headers are lost. Check if HTTP request headers can be read now. */
-    if (httpd_req_get_hdr_value_len(req, "Host") == 0) {
-        ESP_LOGI(TAG, "Request headers lost");
-    }
-    return ESP_OK;
-}
-
-
-static const httpd_uri_t testing = {
-    .uri       = "/testing",
-    .method    = HTTP_GET,
-    .handler   = testing_get_handler,
-    /* Let's pass response string in user
-     * context to demonstrate it's usage */
-    .user_ctx  = "<!DOCTYPE html>\n"
-                 "<html>\n"
-                 "<head>\n"
-                 "    <title>Baliza CI</title>\n"
-                 "</head>\n"
-                 " \n"
-                 "<body>\n"
-                 "    <h2>Bienvenido a Baliza CI - Ingrese sus credenciales</h2>\n"
-                 "    <form>\n"
-                 " \n"
-                 "        <p>\n"
-                 "            <label>Usuario : <input type=\"text\" /></label>\n"
-                 "        </p>\n"
-                 " \n"
-                 "        <p>\n"
-                 "            <label>Contraseña : <input type=\"password\" /></label>\n"
-                 "        </p>\n"
-                 " \n"
-                 "        <p>\n"
-                 "            <button type=\"submit\">Login</button>\n"
-                 "        </p>\n"
-                 " \n"
-                 "    </form>\n"
-                 "</body>\n"
-                 "</html>"
-};
-
-/* An HTTP POST handler */
-static esp_err_t state_post_handler(httpd_req_t *req)
-{
-    char buf[100];
-    int ret, remaining = req->content_len;
-    
-    while (remaining > 0) {
-        /* Read the data for the request */
-        if ((ret = httpd_req_recv(req, buf,
-                        MIN(remaining, sizeof(buf)))) <= 0) {
-            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
-                /* Retry receiving if timeout occurred */
-                continue;
-            }
-            return ESP_FAIL;
-        }
-
-        /* Send back the same data */
-        httpd_resp_send_chunk(req, buf, ret);
-        remaining -= ret;
-
-        /* Log data received */
-        ESP_LOGI(TAG, "=========== RECEIVED DATA ==========");
-        ESP_LOGI(TAG, "%.*s", ret, buf);
-        ESP_LOGI(TAG, "====================================");
-    }
-
-    // End response
-    httpd_resp_send_chunk(req, NULL, 0);
-    return ESP_OK;
-}
-
-static const httpd_uri_t state = {
-    .uri       = "/state",
-    .method    = HTTP_POST,
-    .handler   = state_post_handler,
-    .user_ctx  = NULL
-};
-
-/* This handler allows the custom error handling functionality to be
- * tested from client side. For that, when a PUT request 0 is sent to
- * URI /ctrl, the /hello and /echo URIs are unregistered and following
- * custom error handler http_404_error_handler() is registered.
- * Afterwards, when /hello or /echo is requested, this custom error
- * handler is invoked which, after sending an error message to client,
- * either closes the underlying socket (when requested URI is /echo)
- * or keeps it open (when requested URI is /hello). This allows the
- * client to infer if the custom error handler is functioning as expected
- * by observing the socket state.
- */
-esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err)
-{
-    if (strcmp("/hello", req->uri) == 0) {
-        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "/hello URI is not available");
-        /* Return ESP_OK to keep underlying socket open */
-        return ESP_OK;
-    } else if (strcmp("/echo", req->uri) == 0) {
-        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "/echo URI is not available");
-        /* Return ESP_FAIL to close underlying socket */
-        return ESP_FAIL;
-    }
-    /* For any other URI send 404 and close socket */
-    httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, "Some 404 error message");
-    return ESP_FAIL;
-}
-
-static httpd_handle_t start_webserver(void)
-{
-    httpd_handle_t server = NULL;
-    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-#if CONFIG_IDF_TARGET_LINUX
-    // Setting port as 8001 when building for Linux. Port 80 can be used only by a priviliged user in linux.
-    // So when a unpriviliged user tries to run the application, it throws bind error and the server is not started.
-    // Port 8001 can be used by an unpriviliged user as well. So the application will not throw bind error and the
-    // server will be started.
-    config.server_port = 8001;
-#endif // !CONFIG_IDF_TARGET_LINUX
-    config.lru_purge_enable = true;
-
-    // Start the httpd server
-    ESP_LOGI(TAG, "Starting server on port: '%d'", config.server_port);
-    if (httpd_start(&server, &config) == ESP_OK) {
-        // Set URI handlers
-        ESP_LOGI(TAG, "Registering URI handlers");
-        httpd_register_uri_handler(server, &testing); //ejemplo de get
-        httpd_register_uri_handler(server, &state);   //ejemplo de post
-        #if CONFIG_EXAMPLE_BASIC_AUTH
-        //httpd_register_basic_auth(server);
-        #endif
-        return server;
-    }
-
-    ESP_LOGI(TAG, "Error starting server!");
-    return NULL;
-}
 
 static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
@@ -318,8 +91,8 @@ void wifi_connection()
     wifi_config_t wifi_configuration = {                                                 // struct wifi_config_t var wifi_configuration
                                         .sta = {
                                             .ssid = "",
-    .password = "", /*we are sending a const char of ssid and password which we will strcpy in following line so leaving it blank*/
-        } // also this part is used if you donot want to use Kconfig.projbuild
+                                            .password = "", /*we are sending a const char of ssid and password which we will strcpy in following line so leaving it blank*/
+                                        } // also this part is used if you donot want to use Kconfig.projbuild
     };
 strcpy((char *)wifi_configuration.sta.ssid, WIFI_SSID); // copy chars from hardcoded configs to struct
 strcpy((char *)wifi_configuration.sta.password, WIFI_PASSWORD);
@@ -422,29 +195,28 @@ esp_err_t client_event_get_handler(esp_http_client_event_t *evt){
     return ESP_OK;
 }
 
-char responseBuffer[512];
-
 static void get_workflows_github(){
     esp_http_client_config_t config_get = {
         .url = "https://api.github.com/repos/"REPO_OWNER"/"REPO_NAME"/actions/runs?per_page=1&page=1",
         .method = HTTP_METHOD_GET,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,  //Specify transport type
         .crt_bundle_attach = esp_crt_bundle_attach, //Attach the certificate bundle 
-        .event_handler = client_event_get_handler  
+        .event_handler = client_event_get_handler,
+        .buffer_size = 512
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config_get);
     //char *post_data = "{\"saa\":\"dsdssdadsa\"}";
     //esp_http_client_set_post_field(client, post_data, strlen(post_data));
     esp_http_client_set_header(client,"Content-Type","application/vnd.github+json");
-    esp_http_client_set_header(client,"Authorization","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");
+    esp_http_client_set_header(client,"Authorization","Bearer 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");
     esp_http_client_set_header(client,"X-GitHub-Api-Version","2022-11-28");
 
     esp_http_client_perform(client);
     esp_http_client_cleanup(client);    
 }
 
-void app_main() 
+void app_main(void) 
 {   
     ESP_ERROR_CHECK(nvs_flash_init());
     
@@ -472,7 +244,7 @@ void app_main()
     //esp_rom_gpio_pad_select_gpio(LED_PIN);
     //gpio_set_direction(LED_PIN, GPIO_MODE_OUTPUT);
     
-    static httpd_handle_t server = NULL;
+    //static httpd_handle_t server = NULL;
 
     //ESP_ERROR_CHECK(esp_netif_init());
     //ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -494,10 +266,7 @@ void app_main()
     //test(); 
     
     while(1){
-        /*while(1){
-            beepBuzzer();   
-        }*/
-        
+
         int previous_state = build_state;
         get_workflows_github();
         printf("previous state %d\n",previous_state);
@@ -510,8 +279,8 @@ void app_main()
                 gpio_set_level(LED_AZUL, 0);
                 gpio_set_level(LED_ROJO, 1);
                 if(previous_state==STATE_BUILD_SUCCESS){
-                    stateChangedLed(LED_ROJO);
                     beepBuzzer();
+                    stateChangedLed(LED_ROJO);
                 }
                 break;
             
@@ -528,8 +297,8 @@ void app_main()
                 gpio_set_level(LED_AZUL, 0);
                 gpio_set_level(LED_ROJO, 0);
                 if(previous_state==STATE_BUILD_FAILED){
-                    stateChangedLed(LED_VERDE);
                     beepBuzzer();
+                    stateChangedLed(LED_VERDE);
                 }
                 break;
 
@@ -540,8 +309,10 @@ void app_main()
                 break;
 
         }
-
-        vTaskDelay(DELAY_TIME*15 / portTICK_PERIOD_MS);
+        //consulta cada 18 miuntos
+        //vTaskDelay(DELAY_TIME*1080 / portTICK_PERIOD_MS);
+        //consulta cada 10 sec
+        vTaskDelay(DELAY_TIME*10 / portTICK_PERIOD_MS);
     }
 
 }
@@ -563,50 +334,5 @@ void stateChangedLed(int ledNumber){
         vTaskDelay(DELAY_TIME / portTICK_PERIOD_MS);
         gpio_set_level(ledNumber, 1);
         vTaskDelay(DELAY_TIME / portTICK_PERIOD_MS);
-    }
-}
-
-void test(){
-    
-    build_state = -1;
-    
-    while(1){
-        
-        //Start the server for the first time */
-        build_state = build_state+1;
-        if(build_state>2){
-            build_state = 0;
-        }
-
-        printf("build state %d\n",build_state);
-        switch (build_state){
-            case 0:
-                gpio_set_level(LED_VERDE, 0);
-                gpio_set_level(LED_AZUL, 0);
-                gpio_set_level(LED_ROJO, 1);
-                beepBuzzer();
-                break;
-            
-            case 1: //verde
-                gpio_set_level(LED_AZUL, 0);
-                gpio_set_level(LED_ROJO, 0);
-                gpio_set_level(LED_VERDE, 1);
-                beepBuzzer();
-                break;
-            
-            case 2: //rojo
-                gpio_set_level(LED_VERDE, 0);
-                gpio_set_level(LED_ROJO, 0);
-                gpio_set_level(LED_AZUL, 1);
-                beepBuzzer();
-                break;
-
-            default:
-                gpio_set_level(LED_VERDE, 0);
-                gpio_set_level(LED_ROJO, 0);
-                gpio_set_level(LED_AZUL, 0);
-                break;
-
-        }
     }
 }
