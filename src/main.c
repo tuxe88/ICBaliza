@@ -18,6 +18,7 @@
 #include "freertos/FreeRTOS.h"
 
 int retry_num = 0;
+int build_state = 0;
 
 #define DELAY_TIME 1000
 
@@ -146,7 +147,7 @@ void app_main(void)
     while(1){
 
         int previous_state = build_state;
-        get_workflows_github();
+        build_state = get_workflows_github();
         printf("previous state %d\n",previous_state);
         printf("build state %d\n",build_state);
 

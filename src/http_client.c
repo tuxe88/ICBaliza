@@ -53,13 +53,13 @@ esp_err_t client_event_get_handler(esp_http_client_event_t *evt){
                 printf("completed: %s\n", workflow_status_result);
                 if(strcmp("success",workflow_conclusion_result) == 0){
                     printf("success: %s\n", workflow_conclusion_result);
-                    build_state = 2;
+                    evt->user_data = (void*) 2;
                 }else if(strcmp("failure",workflow_conclusion_result) == 0){
                     printf("failure: %s\n", workflow_conclusion_result);
-                    build_state = 0;
+                    evt->user_data = (void*) 0;
                 }else{
                     printf("other: %s", workflow_conclusion_result);
-                    build_state = 0;
+                    evt->user_data = (void*) 0;
                 }
             }else{
                 output_buffer = NULL;
@@ -91,14 +91,19 @@ esp_err_t client_event_get_handler(esp_http_client_event_t *evt){
     return ESP_OK;
 }
 
-void get_workflows_github(){
+int get_workflows_github(){
+
+    int status = 1;
+    //status = 0;
+
     esp_http_client_config_t config_get = {
         .url = "https://api.github.com/repos/"REPO_OWNER"/"REPO_NAME"/actions/runs?per_page=1&page=1",
         .method = HTTP_METHOD_GET,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,  //Specify transport type
         .crt_bundle_attach = esp_crt_bundle_attach, //Attach the certificate bundle 
         .event_handler = client_event_get_handler,
-        .buffer_size = 512
+        .buffer_size = 512,
+        .user_data = &status
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config_get);
@@ -110,4 +115,7 @@ void get_workflows_github(){
 
     esp_http_client_perform(client);
     esp_http_client_cleanup(client);    
+    printf("%d\n",status);
+
+    return status;
 }
