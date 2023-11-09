@@ -80,18 +80,18 @@ void wifi_connection()
     esp_wifi_init(&wifi_initiation);                                                     // wifi initialised with dafault wifi_initiation
     esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler, NULL);  // creating event handler register for wifi
     esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event_handler, NULL); // creating event handler register for ip event
-    wifi_config_t wifi_configuration = {                                                 // struct wifi_config_t var wifi_configuration
+    wifi_config_t wifi_configuration_sta = {                                                 // struct wifi_config_t var wifi_configuration
                                         .sta = {
                                             .ssid = "",
                                             .password = "", /*we are sending a const char of ssid and password which we will strcpy in following line so leaving it blank*/
                                         } // also this part is used if you donot want to use Kconfig.projbuild
     };
-strcpy((char *)wifi_configuration.sta.ssid, WIFI_SSID); // copy chars from hardcoded configs to struct
-strcpy((char *)wifi_configuration.sta.password, WIFI_PASSWORD);
-esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_configuration); // setting up configs when event ESP_IF_WIFI_STA
-esp_wifi_start();
-esp_wifi_set_mode(WIFI_MODE_STA);     //station mode selected
-esp_wifi_connect();                   // connect with saved ssid and pass
+    strcpy((char *)wifi_configuration_sta.sta.ssid, WIFI_SSID); // copy chars from hardcoded configs to struct
+    strcpy((char *)wifi_configuration_sta.sta.password, WIFI_PASSWORD);
+    esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_configuration_sta); // setting up configs when event ESP_IF_WIFI_STA
+    esp_wifi_start();
+    esp_wifi_set_mode(WIFI_MODE_APSTA);     //station mode selected
+    esp_wifi_connect();                   // connect with saved ssid and pass
 
 }
 
