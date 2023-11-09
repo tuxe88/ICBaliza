@@ -25,8 +25,6 @@ int wifi_state = 0;
 
 #define DELAY_TIME 1000
 
-//pin 22 es el led azul
-
 #define BUZZER GPIO_NUM_18
 #define LED_VERDE GPIO_NUM_23
 #define LED_AZUL GPIO_NUM_21
@@ -44,22 +42,222 @@ void stateChangedLed(int ledNumber);
 
 #define AP_SSID "ICBaliza"
 #define AP_PASSWORD "baliza2023"
-#define AP_IP_ADDR "192.168.1.1" // Static IP for the Access Point
-#define AP_GATEWAY "192.168.1.1"
-#define AP_NETMASK "255.255.255.0"
 #define PORT 80
+
+char status_wifi_ssid[32];
+char status_wifi_password[32];
+int status_max_retries;
+char status_repo_name[128];
+char status_repo_owner[64];
+char status_repo_authorization[64];
 
 static esp_err_t root_handler(httpd_req_t *req)
 {
-    const char *resp_str = "Hello, ESP32 Access Point!";
-    httpd_resp_send(req, resp_str, strlen(resp_str));
+    const char* htmlForm = "<html>\n"
+                      "<head>\n"
+                      "<title>ICBaliza configuration</title>\n"
+                      "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css2?family=Roboto:wght@400&display=swap\">\n"
+                      "<style>\n"
+                      "  body { display: flex; align-items: center; justify-content: center; height: 100vh; background-color: #f4f4f4; font-family: 'Roboto', sans-serif; }\n"
+                      "  form { background-color: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); max-width: 400px; width: 100%; text-align: center; }\n"
+                      "  label { display: block; margin-bottom: 8px; }\n"
+                      "  input { width: 100%; padding: 8px; margin-bottom: 16px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }\n"
+                      "  input[type=\"submit\"] { background-color: #4caf50; color: #fff; cursor: pointer; }\n"
+                      "  h1 { color: #333; font-size: 28px; margin-bottom: 20px; }\n"
+                      "</style>\n"
+                      "</head>\n"
+                      "<body>\n"
+                      "<form action=\"submit\" method=\"post\">\n"
+                      
+                      "  <h1>ICBaliza</h1>\n"
+
+                      "  <label for=\"ssid\">SSID:</label>\n"
+                      "  <input type=\"text\" id=\"ssid\" name=\"ssid\"><br><br>\n"
+
+                      "  <label for=\"password\">Password:</label>\n"
+                      "  <input type=\"password\" id=\"password\" name=\"password\"><br><br>\n"
+
+                      "  <label for=\"retry\">Retry Number:</label>\n"
+                      "  <input type=\"number\" id=\"retry\" name=\"retry\"><br><br>\n"
+
+                      "  <label for=\"repository\">Repository name:</label>\n"
+                      "  <input type=\"text\" id=\"repository\" name=\"repository\"><br><br>\n"
+
+                      "  <label for=\"owner\">Repository Owner:</label>\n"
+                      "  <input type=\"text\" id=\"owner\" name=\"owner\"><br><br>\n"
+
+                      "  <label for=\"authorization\">Authorization:</label>\n"
+                      "  <input type=\"text\" id=\"authorization\" name=\"authorization\"><br><br>\n"
+
+                      "  <input type=\"submit\" value=\"Submit\">\n"
+                      "</form>\n"
+                      "</body>\n"
+                      "</html>\n";
+    httpd_resp_set_type(req, "text/html");
+    httpd_resp_set_hdr(req, "Accept", "text/html");
+    httpd_resp_send(req, htmlForm, strlen(htmlForm));
     return ESP_OK;
+}
+
+static esp_err_t root_handler_post(httpd_req_t *req)
+{
+    
+    const char* htmlMessage = "<!DOCTYPE html>\n"
+                          "<html lang=\"en\">\n"
+                          "<head>\n"
+                          "    <meta charset=\"UTF-8\">\n"
+                          "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n"
+                          "    <title>ICBaliza Configuration successful</title>\n"
+                          "    <style>\n"
+                          "        body {\n"
+                          "            display: flex;\n"
+                          "            align-items: center;\n"
+                          "            justify-content: center;\n"
+                          "            height: 100vh;\n"
+                          "            background-color: #f4f4f4;\n"
+                          "            font-family: Arial, sans-serif;\n"
+                          "        }\n"
+                          "\n"
+                          "        table {\n"
+                          "            border-collapse: collapse;\n"
+                          "            width: 50%;\n"
+                          "            text-align: center;\n"
+                          "        }\n"
+                          "\n"
+                          "        th, td {\n"
+                          "            padding: 20px;\n"
+                          "            border: 1px solid #ddd;\n"
+                          "        }\n"
+                          "\n"
+                          "        h1 {\n"
+                          "            color: #333;\n"
+                          "            font-size: 24px;\n"
+                          "            margin-bottom: 20px;\n"
+                          "        }\n"
+                          "    </style>\n"
+                          "</head>\n"
+                          "<body>\n"
+                          "    <table>\n"
+                          "        <tr>\n"
+                          "            <th colspan=\"2\">\n"
+                          "                <h1>ICBaliza Configuration</h1>\n"
+                          "            </th>\n"
+                          "        </tr>\n"
+                          "        <tr>\n"
+                          "            <td colspan=\"2\">\n"
+                          "                <p>ICBaliza was configured successfully with the received parameters. If the blue light persists after 45 seconds, please check the parameters sent and try again.</p>\n"
+                          "            </td>\n"
+                          "        </tr>\n"
+                          "    </table>\n"
+                          "</body>\n"
+                          "</html>\n";
+
+    
+    char chunk[512];  // Adjust the chunk size based on your requirements
+    size_t received = 0;
+
+    /* Process the request headers if needed */
+    // ...
+
+    /* Receive and process the content in chunks */
+    while (1) {
+        ssize_t ret = httpd_req_recv(req, chunk, sizeof(chunk));
+
+        if (ret <= 0) {
+            if (ret == HTTPD_SOCK_ERR_TIMEOUT) {
+                httpd_resp_send_408(req);
+            }
+            break;
+        }
+
+        received += ret;
+        // Process the received chunk as needed
+        // Example: Print the chunk to the console
+        //ESP_LOGI(TAG, "Received Chunk: %.*s", ret, chunk);
+
+        // Additional processing of the chunk can be done here
+
+        // If you have received the entire form data, break out of the loop
+        if (received >= req->content_len) {
+            break;
+        }
+    }
+
+    /* Null-terminate the chunk to use it as a string */
+    chunk[received] = '\0';
+
+    /* Variables to store form data */
+    char ssid[32];
+    char password[32];
+    char retry[32];
+    char repository[128];
+    char owner[64];
+    char authorization[64];
+
+    /* Parse form fields (assuming it's in x-www-form-urlencoded format) */
+    if (httpd_query_key_value(chunk, "ssid", ssid, sizeof(ssid)) == ESP_OK &&
+        httpd_query_key_value(chunk, "password", password, sizeof(password)) == ESP_OK &&
+        httpd_query_key_value(chunk, "retry", retry, sizeof(retry)) == ESP_OK &&
+        httpd_query_key_value(chunk, "repository", repository, sizeof(repository)) == ESP_OK &&
+        httpd_query_key_value(chunk, "owner", owner, sizeof(owner)) == ESP_OK &&
+        httpd_query_key_value(chunk, "authorization", authorization, sizeof(authorization)) == ESP_OK) {
+        // Handle the form fields (e.g., store them in variables or perform actions)
+        /* Print the values to the console */
+        printf("SSID: %s\n", ssid);
+        printf("Password: **********\n");
+        printf("Retry: %s\n", retry);
+        printf("Repository: %s\n", repository);
+        printf("Owner: %s\n", owner);
+        printf("Authorization: %s\n", authorization);
+
+        esp_wifi_disconnect();
+
+        // Reconfigure WiFi with new credentials
+        wifi_config_t wifi_configuration_sta = {
+            .sta = {
+                .ssid = "",
+                .password = "",
+            },
+        };
+
+        strcpy((char *)wifi_configuration_sta.sta.ssid, ssid); 
+        strcpy((char *)wifi_configuration_sta.sta.password, password);
+        
+        strcpy(status_wifi_ssid, ssid);
+        strcpy(status_wifi_password, password); 
+        strcpy(status_repo_name, repository); 
+        strcpy(status_repo_owner, owner);
+        strcpy(status_repo_authorization, authorization);
+        status_max_retries = 5;
+
+        esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_configuration_sta);
+
+        // Restart WiFi
+        esp_wifi_connect();
+
+        /* Send a response back to the client */
+        httpd_resp_send(req, htmlMessage, strlen(htmlMessage));
+
+        return ESP_OK;
+    } else {
+   
+        const char* responseError = "An error ocurred!";
+        httpd_resp_send(req, responseError, strlen(responseError));
+        return ESP_FAIL;
+    }
 }
 
 static httpd_uri_t root = {
     .uri = "/",
     .method = HTTP_GET,
     .handler = root_handler,
+    .user_ctx = NULL,
+};
+
+static httpd_uri_t rootPost = {
+    .uri = "/submit",
+    .method = HTTP_POST,
+    .handler = root_handler_post,
     .user_ctx = NULL,
 };
 
@@ -126,8 +324,8 @@ void wifi_connection()
                                             .password = "", //we are sending a const char of ssid and password which we will strcpy in following line so leaving it blank
                                         } // also this part is used if you donot want to use Kconfig.projbuild
     };
-    strcpy((char *)wifi_configuration_sta.sta.ssid, WIFI_SSID); // copy chars from hardcoded configs to struct
-    strcpy((char *)wifi_configuration_sta.sta.password, WIFI_PASSWORD);
+    //strcpy((char *)wifi_configuration_sta.sta.ssid, status_wifi_ssid); // copy chars from hardcoded configs to struct
+    //strcpy((char *)wifi_configuration_sta.sta.password, status_wifi_password);
     esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_configuration_sta); // setting up configs when event ESP_IF_WIFI_STA
     esp_wifi_start();
     //esp_wifi_set_mode(WIFI_MODE_STA);     //station mode selected
@@ -171,15 +369,18 @@ void app_main(void)
     wifi_connection();
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.max_uri_handlers = 8; // Adjust as needed
+    config.max_resp_headers = 8 * 1024; // Adjust as needed
     config.server_port = PORT;
     httpd_handle_t server = NULL;
 
     if (httpd_start(&server, &config) == ESP_OK) {
         httpd_register_uri_handler(server, &root);
+        httpd_register_uri_handler(server, &rootPost);
     }
  
     while(1){
-
+        printf("wifi_state: %d",wifi_state);
         if(wifi_state==0){
                 printf("azul");
                 gpio_set_level(LED_VERDE, 0);
@@ -187,7 +388,7 @@ void app_main(void)
                 gpio_set_level(LED_ROJO, 0);
         }else{
             int previous_state = build_state;
-            build_state = get_workflows_github();
+            build_state = get_workflows_github(status_repo_name,status_repo_owner,status_repo_authorization);
             printf("previous state %d\n",previous_state);
             printf("build state %d\n",build_state);
 
@@ -230,7 +431,7 @@ void app_main(void)
             }
         }
 
-        vTaskDelay(DELAY_TIME*10 / portTICK_PERIOD_MS);
+        vTaskDelay(DELAY_TIME*30 / portTICK_PERIOD_MS);
     }
 
 }

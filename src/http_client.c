@@ -3,26 +3,19 @@
 int build_state_http = 0;
 static const char *TAG = "example";
 
-esp_err_t client_event_get_handler(esp_http_client_event_t *evt){
+esp_err_t client_event_get_handler(esp_http_client_event_t *evt) {
 
-    static char *output_buffer;  // Buffer to store response of http request from event handler
-    static int output_len;       // Stores number of bytes read
+    static char *output_buffer;
+    static int output_len;
 
-    switch (evt->event_id)
-    {
+    switch (evt->event_id) {
     case HTTP_EVENT_ON_DATA:
-        //ESP_LOGI(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
-        /*
-         *  Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
-         *  However, event handler can also be used in case chunked encoding is used.
-         */
         if (!esp_http_client_is_chunked_response(evt->client)) {
-            // If user_data buffer is configured, copy the response into the buffer
             if (evt->user_data) {
                 memcpy(evt->user_data + output_len, evt->data, evt->data_len);
             } else {
                 if (output_buffer == NULL) {
-                    output_buffer = (char *) malloc(esp_http_client_get_content_length(evt->client));
+                    output_buffer = (char *)malloc(esp_http_client_get_content_length(evt->client));
                     output_len = 0;
                     if (output_buffer == NULL) {
                         ESP_LOGE(TAG, "Failed to allocate memory for output buffer");
@@ -33,48 +26,28 @@ esp_err_t client_event_get_handler(esp_http_client_event_t *evt){
             }
             output_len += evt->data_len;
         }
-
         break;
     case HTTP_EVENT_ON_FINISH:
-        //ESP_LOGI(TAG, "HTTP_EVENT_ON_FINISH");
         if (output_buffer != NULL) {
-        //printf("status code: %d\n",esp_http_client_get_status_code());
-            cJSON * request_result = cJSON_Parse(output_buffer);
-
-            //printf("%s", cJSON_Print(request_result));
-            cJSON * workflow_status = cJSON_GetObjectItem(cJSON_GetArrayItem(cJSON_GetObjectItem(request_result,"workflow_runs"),0),"status");
-            cJSON * workflow_conclusion = cJSON_GetObjectItem(cJSON_GetArrayItem(cJSON_GetObjectItem(request_result,"workflow_runs"),0),"conclusion");
-            //printf("%s", cJSON_Print(workflow_conclusion));
+            cJSON *request_result = cJSON_Parse(output_buffer);
+            cJSON *workflow_status = cJSON_GetObjectItem(cJSON_GetArrayItem(cJSON_GetObjectItem(request_result, "workflow_runs"), 0), "status");
+            cJSON *workflow_conclusion = cJSON_GetObjectItem(cJSON_GetArrayItem(cJSON_GetObjectItem(request_result, "workflow_runs"), 0), "conclusion");
             free(output_buffer);
             free(request_result);
-            char * workflow_status_result = workflow_status->valuestring;
-            char * workflow_conclusion_result = workflow_conclusion->valuestring;
-            //printf("%s\n", workflow_status_result);
-            //printf("%s\n", workflow_conclusion_result);
-            //printf("%d\n", strcmp("success",workflow_conclusion_result) == 0);
-            if(strcmp("completed",workflow_status_result) == 0){
-                printf("completed: %s\n", workflow_status_result);
-                if(strcmp("success",workflow_conclusion_result) == 0){
-                    printf("success: %s\n", workflow_conclusion_result);
-                    //evt->user_data = malloc(sizeof(int));
-                    //evt->user_data = (void*) 2;
+            char *workflow_status_result = workflow_status->valuestring;
+            char *workflow_conclusion_result = workflow_conclusion->valuestring;
+            if (strcmp("completed", workflow_status_result) == 0) {
+                if (strcmp("success", workflow_conclusion_result) == 0) {
                     build_state_http = 2;
-                }else if(strcmp("failure",workflow_conclusion_result) == 0){
-                    printf("failure: %s\n", workflow_conclusion_result);
-                    //evt->user_data = malloc(sizeof(int));
-                    //evt->user_data = (void*) 0;
+                } else if (strcmp("failure", workflow_conclusion_result) == 0) {
                     build_state_http = 0;
-                }else{
-                    printf("other: %s", workflow_conclusion_result);
-                    //evt->user_data = malloc(sizeof(int));
-                    //evt->user_data = (void*) 0;
+                } else {
                     build_state_http = 0;
                 }
-            }else{
+            } else {
                 output_buffer = NULL;
                 return ESP_OK;
             }
-
             output_buffer = NULL;
         }
         output_len = 0;
@@ -100,36 +73,33 @@ esp_err_t client_event_get_handler(esp_http_client_event_t *evt){
     return ESP_OK;
 }
 
-int get_workflows_github(){
+int get_workflows_github(const char *repo_name, const char *repo_owner, const char *repo_authorization) {
 
-    //int status = 1;
-    //status = 0;
+    char api_url[256];
+    char bearer_auth[256];
+    snprintf(api_url, sizeof(api_url), "https://api.github.com/repos/%s/%s/actions/runs?per_page=1&page=1", repo_owner, repo_name);
+    snprintf(bearer_auth, sizeof(bearer_auth), "Bearer %s", repo_authorization);
 
     esp_http_client_config_t config_get = {
-        .url = "https://api.github.com/repos/"REPO_OWNER"/"REPO_NAME"/actions/runs?per_page=1&page=1",
+        .url = api_url,
         .method = HTTP_METHOD_GET,
-        .transport_type = HTTP_TRANSPORT_OVER_SSL,  //Specify transport type
-        .crt_bundle_attach = esp_crt_bundle_attach, //Attach the certificate bundle 
+        .transport_type = HTTP_TRANSPORT_OVER_SSL,
+        .crt_bundle_attach = esp_crt_bundle_attach,
         .event_handler = client_event_get_handler,
         .buffer_size = 512,
-        //.user_data = &status
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config_get);
-    //char *post_data = "{\"saa\":\"dsdssdadsa\"}";
-    //esp_http_client_set_post_field(client, post_data, strlen(post_data));
-    esp_http_client_set_header(client,"Content-Type","application/vnd.github+json");
-    esp_http_client_set_header(client,"Authorization","Bearer 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");
-    esp_http_client_set_header(client,"X-GitHub-Api-Version","2022-11-28");
+    esp_http_client_set_header(client, "Content-Type", "application/vnd.github+json");
+    esp_http_client_set_header(client, "Authorization", bearer_auth);
+    esp_http_client_set_header(client, "X-GitHub-Api-Version", "2022-11-28");
 
     esp_err_t err = esp_http_client_perform(client);
-    if (err == ESP_OK){
+    if (err == ESP_OK) {
         printf("ddd");
-        //esp_http_client_get_user_data(client,&status);
     }
 
-    esp_http_client_cleanup(client);    
-    //printf("%d\n",status);
+    esp_http_client_cleanup(client);
 
     return build_state_http;
 }
