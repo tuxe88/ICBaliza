@@ -13,9 +13,11 @@
 #include "esp_tls_crypto.h"
 
 #include "http_client.h"
+#include "esp_http_server.h"
 
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 int retry_num = 0;
 int build_state = 0;
@@ -39,6 +41,28 @@ int wifi_state = 0;
 void test();
 void beepBuzzer();
 void stateChangedLed(int ledNumber);
+
+#define AP_SSID "ICBaliza"
+#define AP_PASSWORD "baliza2023"
+#define AP_IP_ADDR "192.168.1.1" // Static IP for the Access Point
+#define AP_GATEWAY "192.168.1.1"
+#define AP_NETMASK "255.255.255.0"
+#define PORT 80
+
+static esp_err_t root_handler(httpd_req_t *req)
+{
+    const char *resp_str = "Hello, ESP32 Access Point!";
+    httpd_resp_send(req, resp_str, strlen(resp_str));
+    return ESP_OK;
+}
+
+static httpd_uri_t root = {
+    .uri = "/",
+    .method = HTTP_GET,
+    .handler = root_handler,
+    .user_ctx = NULL,
+};
+
 
 static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
@@ -71,8 +95,24 @@ static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_b
     }
 }
 
+
+/*static void wifi_event_handler(void *ctx, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_START) {
+        ESP_LOGI(TAG, "Access Point started. SSID: %s", AP_SSID);
+    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
+        ESP_LOGI(TAG, "Station started");
+    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+        ESP_LOGI(TAG, "Station got IP address: " IPSTR, IP2STR(&event->ip_info.ip));
+        wifi_state = 1;
+    }
+    //return ESP_OK;
+}*/
+
 void wifi_connection()
 {
+    
     esp_netif_init();                                                                    // network interdace initialization
     esp_event_loop_create_default();                                                     // responsible for handling and dispatching events
     esp_netif_create_default_wifi_sta();                                                 // sets up necessary data structs for wifi station interface
@@ -83,16 +123,29 @@ void wifi_connection()
     wifi_config_t wifi_configuration_sta = {                                                 // struct wifi_config_t var wifi_configuration
                                         .sta = {
                                             .ssid = "",
-                                            .password = "", /*we are sending a const char of ssid and password which we will strcpy in following line so leaving it blank*/
+                                            .password = "", //we are sending a const char of ssid and password which we will strcpy in following line so leaving it blank
                                         } // also this part is used if you donot want to use Kconfig.projbuild
     };
     strcpy((char *)wifi_configuration_sta.sta.ssid, WIFI_SSID); // copy chars from hardcoded configs to struct
     strcpy((char *)wifi_configuration_sta.sta.password, WIFI_PASSWORD);
     esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_configuration_sta); // setting up configs when event ESP_IF_WIFI_STA
     esp_wifi_start();
-    esp_wifi_set_mode(WIFI_MODE_APSTA);     //station mode selected
+    //esp_wifi_set_mode(WIFI_MODE_STA);     //station mode selected
     esp_wifi_connect();                   // connect with saved ssid and pass
+    
+    esp_netif_create_default_wifi_ap();
+    wifi_config_t ap_config = {
+        .ap = {
+            .ssid = AP_SSID,
+            .password = AP_PASSWORD,
+            .max_connection = 4,
+            .authmode = WIFI_AUTH_WPA_WPA2_PSK,
+        },
+    };
 
+    esp_wifi_set_mode(WIFI_MODE_APSTA);
+    esp_wifi_set_config(ESP_IF_WIFI_AP, &ap_config);
+    esp_wifi_start();
 }
 
 void app_main(void) 
@@ -116,6 +169,14 @@ void app_main(void)
     gpio_set_level(BUZZER, 0);
 
     wifi_connection();
+
+    httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.server_port = PORT;
+    httpd_handle_t server = NULL;
+
+    if (httpd_start(&server, &config) == ESP_OK) {
+        httpd_register_uri_handler(server, &root);
+    }
  
     while(1){
 
