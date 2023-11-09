@@ -1,5 +1,5 @@
-#ifndef _HTTP_CLIENT_H
-#define _HTTP_CLIENT_H
+#ifndef _WIFI_MANAGER_H
+#define _WIFI_MANAGER_H
 
 #include "esp_http_client.h"
 #include <cJSON.h>
@@ -12,4 +12,4 @@
 esp_err_t client_event_get_handler(esp_http_client_event_t *evt);
 int get_workflows_github();
 
-#endif //HTTP_CLIENT_H
+#endif //_WIFI_MANAGER_H

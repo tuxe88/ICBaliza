@@ -1,5 +1,8 @@
 #include "http_client.h"
 
+int build_state_http = 0;
+static const char *TAG = "example";
+
 esp_err_t client_event_get_handler(esp_http_client_event_t *evt){
 
     static char *output_buffer;  // Buffer to store response of http request from event handler
@@ -53,13 +56,19 @@ esp_err_t client_event_get_handler(esp_http_client_event_t *evt){
                 printf("completed: %s\n", workflow_status_result);
                 if(strcmp("success",workflow_conclusion_result) == 0){
                     printf("success: %s\n", workflow_conclusion_result);
-                    evt->user_data = (void*) 2;
+                    //evt->user_data = malloc(sizeof(int));
+                    //evt->user_data = (void*) 2;
+                    build_state_http = 2;
                 }else if(strcmp("failure",workflow_conclusion_result) == 0){
                     printf("failure: %s\n", workflow_conclusion_result);
-                    evt->user_data = (void*) 0;
+                    //evt->user_data = malloc(sizeof(int));
+                    //evt->user_data = (void*) 0;
+                    build_state_http = 0;
                 }else{
                     printf("other: %s", workflow_conclusion_result);
-                    evt->user_data = (void*) 0;
+                    //evt->user_data = malloc(sizeof(int));
+                    //evt->user_data = (void*) 0;
+                    build_state_http = 0;
                 }
             }else{
                 output_buffer = NULL;
@@ -93,7 +102,7 @@ esp_err_t client_event_get_handler(esp_http_client_event_t *evt){
 
 int get_workflows_github(){
 
-    int status = 1;
+    //int status = 1;
     //status = 0;
 
     esp_http_client_config_t config_get = {
@@ -103,7 +112,7 @@ int get_workflows_github(){
         .crt_bundle_attach = esp_crt_bundle_attach, //Attach the certificate bundle 
         .event_handler = client_event_get_handler,
         .buffer_size = 512,
-        .user_data = &status
+        //.user_data = &status
     };
 
     esp_http_client_handle_t client = esp_http_client_init(&config_get);
@@ -113,9 +122,14 @@ int get_workflows_github(){
     esp_http_client_set_header(client,"Authorization","Bearer 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");
     esp_http_client_set_header(client,"X-GitHub-Api-Version","2022-11-28");
 
-    esp_http_client_perform(client);
-    esp_http_client_cleanup(client);    
-    printf("%d\n",status);
+    esp_err_t err = esp_http_client_perform(client);
+    if (err == ESP_OK){
+        printf("ddd");
+        //esp_http_client_get_user_data(client,&status);
+    }
 
-    return status;
+    esp_http_client_cleanup(client);    
+    //printf("%d\n",status);
+
+    return build_state_http;
 }
