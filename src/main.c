@@ -1,14 +1,14 @@
-#include <string.h> //for handling strings
+#include <string.h> 
 #include <stdlib.h>
 #include <stddef.h>
 #include <sys/param.h>
-#include <stdio.h> //for basic printf commands
-#include "esp_system.h" //esp_init funtions esp_err_t 
-#include "esp_wifi.h" //esp_wifi_init functions and wifi operations
-#include "esp_log.h" //for showing logs
-#include "esp_event.h" //for wifi event
-#include "nvs_flash.h" //non volatile storage
-#include "lwip/err.h" //light weight ip packets error handling
+#include <stdio.h> 
+#include "esp_system.h" 
+#include "esp_wifi.h" 
+#include "esp_log.h" 
+#include "esp_event.h" 
+#include "nvs_flash.h" 
+#include "lwip/err.h" 
 #include "secrets.h"
 #include "esp_tls_crypto.h"
 
@@ -18,6 +18,9 @@
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+
+#undef CONFIG_HTTPD_MAX_REQ_HDR_LEN
+#define CONFIG_HTTPD_MAX_REQ_HDR_LEN 1024
 
 int retry_num = 0;
 int build_state = 0;
@@ -68,7 +71,7 @@ static esp_err_t root_handler(httpd_req_t *req)
                       "</head>\n"
                       "<body>\n"
                       "<form action=\"submit\" method=\"post\">\n"
-                      
+
                       "  <h1>ICBaliza</h1>\n"
 
                       "  <label for=\"ssid\">SSID:</label>\n"
@@ -101,7 +104,7 @@ static esp_err_t root_handler(httpd_req_t *req)
 
 static esp_err_t root_handler_post(httpd_req_t *req)
 {
-    
+
     const char* htmlMessage = "<!DOCTYPE html>\n"
                           "<html lang=\"en\">\n"
                           "<head>\n"
@@ -152,14 +155,9 @@ static esp_err_t root_handler_post(httpd_req_t *req)
                           "</body>\n"
                           "</html>\n";
 
-    
-    char chunk[512];  // Adjust the chunk size based on your requirements
+    char chunk[512];  
     size_t received = 0;
 
-    /* Process the request headers if needed */
-    // ...
-
-    /* Receive and process the content in chunks */
     while (1) {
         ssize_t ret = httpd_req_recv(req, chunk, sizeof(chunk));
 
@@ -171,22 +169,14 @@ static esp_err_t root_handler_post(httpd_req_t *req)
         }
 
         received += ret;
-        // Process the received chunk as needed
-        // Example: Print the chunk to the console
-        //ESP_LOGI(TAG, "Received Chunk: %.*s", ret, chunk);
 
-        // Additional processing of the chunk can be done here
-
-        // If you have received the entire form data, break out of the loop
         if (received >= req->content_len) {
             break;
         }
     }
 
-    /* Null-terminate the chunk to use it as a string */
     chunk[received] = '\0';
 
-    /* Variables to store form data */
     char ssid[32];
     char password[32];
     char retry[32];
@@ -194,15 +184,13 @@ static esp_err_t root_handler_post(httpd_req_t *req)
     char owner[64];
     char authorization[64];
 
-    /* Parse form fields (assuming it's in x-www-form-urlencoded format) */
     if (httpd_query_key_value(chunk, "ssid", ssid, sizeof(ssid)) == ESP_OK &&
         httpd_query_key_value(chunk, "password", password, sizeof(password)) == ESP_OK &&
         httpd_query_key_value(chunk, "retry", retry, sizeof(retry)) == ESP_OK &&
         httpd_query_key_value(chunk, "repository", repository, sizeof(repository)) == ESP_OK &&
         httpd_query_key_value(chunk, "owner", owner, sizeof(owner)) == ESP_OK &&
         httpd_query_key_value(chunk, "authorization", authorization, sizeof(authorization)) == ESP_OK) {
-        // Handle the form fields (e.g., store them in variables or perform actions)
-        /* Print the values to the console */
+
         printf("SSID: %s\n", ssid);
         printf("Password: **********\n");
         printf("Retry: %s\n", retry);
@@ -212,7 +200,6 @@ static esp_err_t root_handler_post(httpd_req_t *req)
 
         esp_wifi_disconnect();
 
-        // Reconfigure WiFi with new credentials
         wifi_config_t wifi_configuration_sta = {
             .sta = {
                 .ssid = "",
@@ -222,7 +209,7 @@ static esp_err_t root_handler_post(httpd_req_t *req)
 
         strcpy((char *)wifi_configuration_sta.sta.ssid, ssid); 
         strcpy((char *)wifi_configuration_sta.sta.password, password);
-        
+
         strcpy(status_wifi_ssid, ssid);
         strcpy(status_wifi_password, password); 
         strcpy(status_repo_name, repository); 
@@ -232,15 +219,13 @@ static esp_err_t root_handler_post(httpd_req_t *req)
 
         esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_configuration_sta);
 
-        // Restart WiFi
         esp_wifi_connect();
 
-        /* Send a response back to the client */
         httpd_resp_send(req, htmlMessage, strlen(htmlMessage));
 
         return ESP_OK;
     } else {
-   
+
         const char* responseError = "An error ocurred!";
         httpd_resp_send(req, responseError, strlen(responseError));
         return ESP_FAIL;
@@ -261,10 +246,9 @@ static httpd_uri_t rootPost = {
     .user_ctx = NULL,
 };
 
-
 static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
-    //build_state = STATE_DISCONNECTED;
+
     if (event_id == WIFI_EVENT_STA_START)
     {
         printf("WIFI CONNECTING....\n");
@@ -293,44 +277,28 @@ static void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_b
     }
 }
 
-
-/*static void wifi_event_handler(void *ctx, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_AP_START) {
-        ESP_LOGI(TAG, "Access Point started. SSID: %s", AP_SSID);
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        ESP_LOGI(TAG, "Station started");
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-        ESP_LOGI(TAG, "Station got IP address: " IPSTR, IP2STR(&event->ip_info.ip));
-        wifi_state = 1;
-    }
-    //return ESP_OK;
-}*/
-
 void wifi_connection()
 {
-    
-    esp_netif_init();                                                                    // network interdace initialization
-    esp_event_loop_create_default();                                                     // responsible for handling and dispatching events
-    esp_netif_create_default_wifi_sta();                                                 // sets up necessary data structs for wifi station interface
-    wifi_init_config_t wifi_initiation = WIFI_INIT_CONFIG_DEFAULT();                     // sets up wifi wifi_init_config struct with default values
-    esp_wifi_init(&wifi_initiation);                                                     // wifi initialised with dafault wifi_initiation
-    esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler, NULL);  // creating event handler register for wifi
-    esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event_handler, NULL); // creating event handler register for ip event
-    wifi_config_t wifi_configuration_sta = {                                                 // struct wifi_config_t var wifi_configuration
+
+    esp_netif_init();                                                                    
+    esp_event_loop_create_default();                                                     
+    esp_netif_create_default_wifi_sta();                                                 
+    wifi_init_config_t wifi_initiation = WIFI_INIT_CONFIG_DEFAULT();                     
+    esp_wifi_init(&wifi_initiation);                                                     
+    esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, wifi_event_handler, NULL);  
+    esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event_handler, NULL); 
+    wifi_config_t wifi_configuration_sta = {                                                 
                                         .sta = {
                                             .ssid = "",
-                                            .password = "", //we are sending a const char of ssid and password which we will strcpy in following line so leaving it blank
-                                        } // also this part is used if you donot want to use Kconfig.projbuild
+                                            .password = "", 
+                                        } 
     };
-    //strcpy((char *)wifi_configuration_sta.sta.ssid, status_wifi_ssid); // copy chars from hardcoded configs to struct
-    //strcpy((char *)wifi_configuration_sta.sta.password, status_wifi_password);
-    esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_configuration_sta); // setting up configs when event ESP_IF_WIFI_STA
+
+    esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_configuration_sta); 
     esp_wifi_start();
-    //esp_wifi_set_mode(WIFI_MODE_STA);     //station mode selected
-    esp_wifi_connect();                   // connect with saved ssid and pass
-    
+
+    esp_wifi_connect();                   
+
     esp_netif_create_default_wifi_ap();
     wifi_config_t ap_config = {
         .ap = {
@@ -349,7 +317,7 @@ void wifi_connection()
 void app_main(void) 
 {   
     ESP_ERROR_CHECK(nvs_flash_init());
-    
+
     gpio_reset_pin(LED_ROJO);
     gpio_set_direction(LED_ROJO, GPIO_MODE_OUTPUT);
     gpio_set_level(LED_ROJO, 0);
@@ -369,8 +337,8 @@ void app_main(void)
     wifi_connection();
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = 8; // Adjust as needed
-    config.max_resp_headers = 8 * 1024; // Adjust as needed
+    config.max_uri_handlers = 8; 
+    config.max_resp_headers = 8 * 1024; 
     config.server_port = PORT;
     httpd_handle_t server = NULL;
 
@@ -378,7 +346,7 @@ void app_main(void)
         httpd_register_uri_handler(server, &root);
         httpd_register_uri_handler(server, &rootPost);
     }
- 
+
     while(1){
         printf("wifi_state: %d",wifi_state);
         if(wifi_state==0){
@@ -393,7 +361,7 @@ void app_main(void)
             printf("build state %d\n",build_state);
 
             switch (build_state){
-                case 0: //rojo
+                case 0: 
                     printf("rojo");
                     gpio_set_level(LED_VERDE, 0);
                     gpio_set_level(LED_AZUL, 0);
@@ -403,15 +371,15 @@ void app_main(void)
                         stateChangedLed(LED_ROJO);
                     }
                     break;
-                
-                case 1: //azul
+
+                case 1: 
                     printf("azul");
                     gpio_set_level(LED_VERDE, 0);
                     gpio_set_level(LED_AZUL, 1);
                     gpio_set_level(LED_ROJO, 0);
                     break;
-                
-                case 2: //verde
+
+                case 2: 
                     printf("verde");
                     gpio_set_level(LED_VERDE, 1);
                     gpio_set_level(LED_AZUL, 0);
