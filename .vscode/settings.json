@@ -18,12 +18,17 @@
         "unity.h": "c",
         "esp_tls.h": "c",
         "http_client.h": "c",
+<<<<<<< HEAD
         "algorithm": "c",
         "*.tcc": "c",
         "memory": "c",
         "new": "c",
         "numeric": "c",
         "system_error": "c"
+=======
+        "esp_http_client.h": "c",
+        "esp_crt_bundle.h": "c"
+>>>>>>> aad0a3636c1495ca4cb9f03c53a30a1d82799469
     },
     "C_Cpp.errorSquiggles": "disabled",
     "cmake.configureOnOpen": true

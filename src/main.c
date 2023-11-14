@@ -252,7 +252,7 @@ void app_main(void)
                 gpio_set_level(LED_ROJO, 0);
         }else{
             int previous_state = build_state;
-            build_state = get_workflow_results(status_repo_name,status_repo_owner,status_repo_authorization);
+            build_state = get_workflows_github(status_repo_name,status_repo_owner,status_repo_authorization);
             printf("previous state %d\n",previous_state);
             printf("build state %d\n",build_state);
 
