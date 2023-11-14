@@ -50,9 +50,9 @@ void stateChangedLed(int ledNumber);
 char status_wifi_ssid[32];
 char status_wifi_password[32];
 int status_max_retries;
-char status_repo_name[128];
-char status_repo_owner[64];
-char status_repo_authorization[64];
+char status_repo_name[128] = "ICBalizaTester";
+char status_repo_owner[64] = "Tuxe88";
+char status_repo_authorization[64] = "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";
 
 static esp_err_t root_handler(httpd_req_t *req)
 {
@@ -198,8 +198,8 @@ void wifi_connection()
     esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event_handler, NULL); 
     wifi_config_t wifi_configuration_sta = {                                                 
                                         .sta = {
-                                            .ssid = "",
-                                            .password = "", 
+                                            .ssid = "WiFi-HCDN-2.4",
+                                            .password = "diputados24", 
                                         } 
     };
 
@@ -245,6 +245,18 @@ void app_main(void)
 
     wifi_connection();
 
+    int cantRequest = 0;
+
+    while(1) {
+        if(wifi_state){
+            int test = get_workflows_github_test(status_repo_name,status_repo_owner,status_repo_authorization);
+            printf("%d\n", test);    
+            cantRequest++;
+            printf("cant requests: %d\n", cantRequest);
+            vTaskDelay(DELAY_TIME / portTICK_PERIOD_MS);
+        }
+    }
+
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 8; 
     config.max_resp_headers = 8 * 1024; 
@@ -255,7 +267,7 @@ void app_main(void)
         httpd_register_uri_handler(server, &root);
         httpd_register_uri_handler(server, &rootPost);
     }
-
+    
     while(1){
         printf("wifi_state: %d",wifi_state);
         if(wifi_state==0){
@@ -308,7 +320,7 @@ void app_main(void)
             }
         }
 
-        vTaskDelay(DELAY_TIME*30 / portTICK_PERIOD_MS);
+        vTaskDelay(DELAY_TIME*5 / portTICK_PERIOD_MS);
     }
 
 }
