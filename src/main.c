@@ -23,7 +23,7 @@
 #define CONFIG_HTTPD_MAX_REQ_HDR_LEN 1024
 
 int retry_num = 0;
-int build_state = 0;
+int build_state = -1;
 int wifi_state = 0;
 
 #define DELAY_TIME 1000
@@ -39,7 +39,8 @@ int wifi_state = 0;
 
 #define EXAMPLE_HTTP_QUERY_KEY_MAX_LEN  (64)
 
-void test();
+void initHardware();
+void checkHardware();
 void beepBuzzer();
 void stateChangedLed(int ledNumber);
 
@@ -227,22 +228,8 @@ void app_main(void)
 {   
     ESP_ERROR_CHECK(nvs_flash_init());
 
-    gpio_reset_pin(LED_ROJO);
-    gpio_set_direction(LED_ROJO, GPIO_MODE_OUTPUT);
-    gpio_set_level(LED_ROJO, 0);
-
-    gpio_reset_pin(LED_AZUL);
-    gpio_set_direction(LED_AZUL, GPIO_MODE_OUTPUT);
-    gpio_set_level(LED_AZUL, 0);
-
-    gpio_reset_pin(LED_VERDE);
-    gpio_set_direction(LED_VERDE, GPIO_MODE_OUTPUT);
-    gpio_set_level(LED_VERDE, 0);
-
-    gpio_reset_pin(BUZZER);
-    gpio_set_direction(BUZZER, GPIO_MODE_OUTPUT);
-    gpio_set_level(BUZZER, 0);
-
+    initHardware();
+    checkHardware();
     wifi_connection();
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -257,21 +244,21 @@ void app_main(void)
     }
 
     while(1){
-        printf("wifi_state: %d",wifi_state);
+        printf("wifi_state: %d \n",wifi_state);
         if(wifi_state==0){
-                printf("azul");
+                printf("azul\n");
                 gpio_set_level(LED_VERDE, 0);
                 gpio_set_level(LED_AZUL, 1);
                 gpio_set_level(LED_ROJO, 0);
         }else{
             int previous_state = build_state;
-            build_state = get_workflows_github(status_repo_name,status_repo_owner,status_repo_authorization);
+            build_state = get_workflow_results(status_repo_name,status_repo_owner,status_repo_authorization);
             printf("previous state %d\n",previous_state);
             printf("build state %d\n",build_state);
 
             switch (build_state){
                 case 0: 
-                    printf("rojo");
+                    printf("rojo\n");
                     gpio_set_level(LED_VERDE, 0);
                     gpio_set_level(LED_AZUL, 0);
                     gpio_set_level(LED_ROJO, 1);
@@ -282,14 +269,14 @@ void app_main(void)
                     break;
 
                 case 1: 
-                    printf("azul");
+                    printf("azul\n");
                     gpio_set_level(LED_VERDE, 0);
                     gpio_set_level(LED_AZUL, 1);
                     gpio_set_level(LED_ROJO, 0);
                     break;
 
                 case 2: 
-                    printf("verde");
+                    printf("verde\n");
                     gpio_set_level(LED_VERDE, 1);
                     gpio_set_level(LED_AZUL, 0);
                     gpio_set_level(LED_ROJO, 0);
@@ -308,20 +295,17 @@ void app_main(void)
             }
         }
 
-        vTaskDelay(DELAY_TIME*30 / portTICK_PERIOD_MS);
+        vTaskDelay(DELAY_TIME*15 / portTICK_PERIOD_MS);
     }
 
 }
 
 void beepBuzzer(){
     gpio_set_level(BUZZER, 0);
-    printf("beep apagado");
     vTaskDelay(DELAY_TIME/2 / portTICK_PERIOD_MS);
     gpio_set_level(BUZZER, 1);
-    printf("beep prendido");
     vTaskDelay(DELAY_TIME/2 / portTICK_PERIOD_MS);
     gpio_set_level(BUZZER, 0);
-    printf("beep apagado");
 }
 
 void stateChangedLed(int ledNumber){
@@ -331,4 +315,45 @@ void stateChangedLed(int ledNumber){
         gpio_set_level(ledNumber, 1);
         vTaskDelay(DELAY_TIME/2 / portTICK_PERIOD_MS);
     }
+}
+
+void initHardware(){
+    gpio_reset_pin(LED_ROJO);
+    gpio_set_direction(LED_ROJO, GPIO_MODE_OUTPUT);
+    gpio_set_level(LED_ROJO, 0);
+
+    gpio_reset_pin(LED_AZUL);
+    gpio_set_direction(LED_AZUL, GPIO_MODE_OUTPUT);
+    gpio_set_level(LED_AZUL, 0);
+
+    gpio_reset_pin(LED_VERDE);
+    gpio_set_direction(LED_VERDE, GPIO_MODE_OUTPUT);
+    gpio_set_level(LED_VERDE, 0);
+
+    gpio_reset_pin(BUZZER);
+    gpio_set_direction(BUZZER, GPIO_MODE_OUTPUT);
+    gpio_set_level(BUZZER, 0);
+}
+
+void checkHardware(){
+    //test buzzer
+    beepBuzzer();
+
+    //test led rojo
+    gpio_set_level(LED_ROJO, 1);
+    vTaskDelay(DELAY_TIME / portTICK_PERIOD_MS);
+    gpio_set_level(LED_ROJO, 0);
+    vTaskDelay(DELAY_TIME / portTICK_PERIOD_MS);
+    
+    //test led azul
+    gpio_set_level(LED_AZUL, 1);
+    vTaskDelay(DELAY_TIME / portTICK_PERIOD_MS);
+    gpio_set_level(LED_AZUL, 0);
+    vTaskDelay(DELAY_TIME / portTICK_PERIOD_MS);
+
+    //test led verde
+    gpio_set_level(LED_VERDE, 1);
+    vTaskDelay(DELAY_TIME / portTICK_PERIOD_MS);
+    gpio_set_level(LED_VERDE, 0);
+    vTaskDelay(DELAY_TIME / portTICK_PERIOD_MS);
 }
