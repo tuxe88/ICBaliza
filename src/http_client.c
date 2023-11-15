@@ -1,6 +1,6 @@
 #include "http_client.h"
 
-int build_state_http = 0;
+static int build_state_http = 0;
 char workflow_status[20];
 char workflow_conclusion [20]; 
 #define MAX_HTTP_RECV_BUFFER 1024
@@ -26,20 +26,13 @@ esp_err_t client_event_get_handler(esp_http_client_event_t *evt) {
             break;
         case HTTP_EVENT_ON_DATA:
             ESP_LOGD(TAG, "HTTP_EVENT_ON_DATA, len=%d", evt->data_len);
-            // Clean the buffer in case of a new request
             if (output_len == 0 && evt->user_data) {
-                // we are just starting to copy the output data into the use
                 memset(evt->user_data, 0, MAX_HTTP_OUTPUT_BUFFER);
             }
-            /*
-             *  Check for chunked encoding is added as the URL for chunked encoding used in this example returns binary data.
-             *  However, event handler can also be used in case chunked encoding is used.
-             */
+
             if (!esp_http_client_is_chunked_response(evt->client)) {
-                // If user_data buffer is configured, copy the response into the buffer
                 int copy_len = 0;
                 if (evt->user_data) {
-                    // The last byte in evt->user_data is kept for the NULL character in case of out-of-bound access.
                     copy_len = MIN(evt->data_len, (MAX_HTTP_OUTPUT_BUFFER - output_len));
                     if (copy_len) {
                         memcpy(evt->user_data + output_len, evt->data, copy_len);
@@ -47,7 +40,6 @@ esp_err_t client_event_get_handler(esp_http_client_event_t *evt) {
                 } else {
                     int content_len = esp_http_client_get_content_length(evt->client);
                     if (output_buffer == NULL) {
-                        // We initialize output_buffer with 0 because it is used by strlen() and similar functions therefore should be null terminated.
                         output_buffer = (char *) calloc(content_len + 1, sizeof(char));
                         output_len = 0;
                         if (output_buffer == NULL) {
@@ -91,6 +83,7 @@ esp_err_t client_event_get_handler(esp_http_client_event_t *evt) {
                     }
                 }
 
+                //libero memoria
                 free(ws);
                 free(wc);
                 cJSON_Delete(request_result);
