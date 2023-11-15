@@ -12,8 +12,6 @@
 
 
 esp_err_t client_event_get_handler(esp_http_client_event_t *evt);
-esp_err_t client_event_get_handler_test(esp_http_client_event_t *evt);
 int get_workflows_github(const char *repo_name, const char *repo_owner, const char *repo_authorization);
-int get_workflows_github_test(const char *repo_name, const char *repo_owner, const char *repo_authorization);
 
 #endif //HTTP_CLIENT_H
