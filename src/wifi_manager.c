@@ -3,27 +3,23 @@
 static int wifi_state_manager = 0;
 int retry_num = 0;
 
-#define AP_SSID "ICBaliza"
-#define AP_PASSWORD "baliza2023"
-
-
 void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
 
     if (event_id == WIFI_EVENT_STA_START)
     {
         printf("WIFI CONNECTING....\n");
-        wifi_state_manager = 0;
+        wifi_state_manager = WIFI_DISCONNECTED;
     }
     else if (event_id == WIFI_EVENT_STA_CONNECTED)
     {
         printf("WiFi CONNECTED\n");
-        wifi_state_manager = 1;
+        wifi_state_manager = WIFI_CONNECTED;
     }
     else if (event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
         printf("WiFi lost connection\n");
-        wifi_state_manager = 0;
+        wifi_state_manager = WIFI_DISCONNECTED;
         if (retry_num < 5)
         {
             esp_wifi_connect();
@@ -34,10 +30,13 @@ void wifi_event_handler(void *event_handler_arg, esp_event_base_t event_base, in
     else if (event_id == IP_EVENT_STA_GOT_IP)
     {
         printf("Wifi got IP...\n\n");
-        wifi_state_manager = 1;
+        wifi_state_manager = WIFI_CONNECTED;
     }
 }
 
+/**
+ * initialize wifi connection, with the default configuration
+*/
 void wifi_connection()
 {
 
@@ -75,6 +74,13 @@ void wifi_connection()
     esp_wifi_start();
 }
 
+/***
+ * 
+ * 
+ * returns:
+   WIFI_DISCONNECTED 0
+   WIFI_CONNECTED 1
+ */
 int get_wifi_status(){
     return wifi_state_manager;
 }

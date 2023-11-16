@@ -29,7 +29,6 @@ int build_state = -1;
 #define LED_AZUL GPIO_NUM_21
 #define LED_ROJO GPIO_NUM_22 
 
-#define STATE_DISCONNECTED 1
 #define STATE_BUILD_FAILED 0
 #define STATE_BUILD_SUCCESS 2
 
@@ -40,5 +39,9 @@ void checkHardware();
 void beepBuzzer();
 void stateChangedLed(int ledNumber);
 void report_status();
+void turnOnBlueLed();
+void turnOnRedLed();
+void turnOnGreenLed();
+void turnOfLed();
 
 #endif // _MAIN_C_

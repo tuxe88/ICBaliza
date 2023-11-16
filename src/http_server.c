@@ -1,5 +1,7 @@
 #include "http_server.h"
 
+
+/**vars for holding form posted data**/
 char status_wifi_ssid[32];
 char status_wifi_password[32];
 int status_max_retries;
@@ -201,6 +203,9 @@ static httpd_uri_t rootPost = {
     .user_ctx = NULL,
 };
 
+/**
+ * Inits http server in PORT 80 by default
+*/
 void init_http_server() {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 8; 
@@ -214,14 +219,23 @@ void init_http_server() {
     }
 }
 
+/**
+ * returns the char* repo name configured in the UI form
+*/
 char* get_repo_name(){
     return status_repo_name;
 }
 
+/**
+ * returns the char* repo owner configured in the UI form
+*/
 char* get_repo_owner(){
     return status_repo_owner;
 }
 
+/**
+ * returns the char* authorization key configured in the UI form
+*/
 char* get_repo_authorization(){
     return status_repo_authorization;
 }
